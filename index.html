@@ -104,11 +104,11 @@ textarea.csv{height:140px;font-family:ui-monospace,Menlo,monospace;font-size:12p
 <div id="histTable"></div>
 <div class="note" id="histNote"></div>
 <details style="margin-top:14px"><summary style="cursor:pointer;color:var(--royal);font-weight:600">Sharing and export</summary>
-<div class="row" style="margin:10px 0"><div style="width:320px"><label>GitHub token (fine-grained, Contents read and write on vp-program-builder only)</label><input id="ghtoken" type="password" placeholder="github_pat_..." autocomplete="off"></div><button class="ghost small" id="saveTok">Save token in this browser</button><button class="ghost small" id="clearTok">Remove token</button><button class="ghost small" id="refreshHist">Refresh list</button><button class="ghost small" id="copyHist">Copy list as CSV</button></div>
-<div class="tiles" id="hTiles" style="margin:0"></div></details>
+<div class="row" style="margin:10px 0"><div style="width:320px"><label>GitHub token (fine-grained, Contents read and write on vp-program-builder only)</label><input id="ghtoken" type="password" placeholder="github_pat_..." autocomplete="off"></div><button class="ghost small" id="saveTok">Save token in this browser</button><button class="ghost small" id="clearTok">Remove token</button><button class="ghost small" id="refreshHist">Refresh list</button><button class="ghost small" id="copyHist">Copy list as CSV</button></div></details>
 </section></div>
 <div id="detailView" hidden>
 <div class="row" style="margin-bottom:12px;align-items:center"><button class="ghost" id="backBtn">Back to list</button><h2 id="detailTitle" style="flex:1;margin:0 8px"></h2><button id="previewBtn">Preview for builder</button><button class="danger" id="delBtn">Delete</button></div>
+<div class="tiles" id="hTiles"></div>
 
 <section class="card">
 <h2>Job and settings</h2>
@@ -344,6 +344,7 @@ function renderResults(rows,p){
   c+='\nHours build\nArea,Item,Guideline row,Who,Stage,Each,Qty,Total hours\n';
   rows.forEach(r=>{ c+=[q(r.area),q(r.item),q(r.ref),r.who,q(r.stage),r.each,r.qty,r2(r.total)].join(',')+'\n'; });
   $('csv').value=c;
+  renderTiles();
 }
 function recalc(skipAreas){
   save(); const rows=build(); const p=plan(rows); renderResults(rows,p);
@@ -436,13 +437,26 @@ function filteredHist(){
   const q=$('hq').value.trim().toLowerCase(), st='';
   return HIST.filter(h=>(!st||h.status===st)&&(!q||((h.name||'')+' '+(h.ref||'')+' '+(h.notes||'')).toLowerCase().includes(q)));
 }
+function renderTiles(){
+  const all=HIST.filter(h=>h.units>0);
+  const tot=all.reduce((s,h)=>({u:s.u+h.units,v:s.v+h.vp,d:s.d+h.djb}),{u:0,v:0,d:0});
+  const act=HIST.filter(h=>h.actualVp>0||h.actualDjb>0);
+  const est=act.reduce((s,h)=>s+h.vp+h.djb,0), actual=act.reduce((s,h)=>s+(+h.actualVp||0)+(+h.actualDjb||0),0);
+  const myEst=LAST.vp+LAST.djb, myAct=(+S.actualVp||0)+(+S.actualDjb||0);
+  const tile=(b,s)=>'<div class="tile"><b>'+b+'</b><span>'+s+'</span></div>';
+  $('hTiles').innerHTML=tile(LAST.units>0?r1(myEst/LAST.units):'-','This job, hours per unit')+
+    tile(myAct>0&&myEst>0?Math.round(myAct/myEst*100)+'%':'-','This job, actual vs programmed')+
+    tile(tot.u?r1((tot.v+tot.d)/tot.u):'-','Average hours per unit, all programs')+
+    tile(act.length&&est?Math.round(actual/est*100)+'%':'-','Actual vs programmed, all ('+act.length+' with actuals)')+
+    tile(HIST.length,'Programs saved');
+}
 function renderHistory(){
   const list=filteredHist();
   const withUnits=list.filter(h=>h.units>0);
   const tot=withUnits.reduce((s,h)=>({u:s.u+h.units,v:s.v+h.vp,d:s.d+h.djb}),{u:0,v:0,d:0});
   const act=list.filter(h=>h.actualVp>0||h.actualDjb>0);
   const est=act.reduce((s,h)=>s+h.vp+h.djb,0), actual=act.reduce((s,h)=>s+(+h.actualVp||0)+(+h.actualDjb||0),0);
-  $('hTiles').innerHTML='<div class="tile"><b>'+list.length+'</b><span>Programs</span></div><div class="tile"><b>'+(tot.u?r1((tot.v+tot.d)/tot.u):'-')+'</b><span>Average hours per unit</span></div><div class="tile"><b>'+(act.length&&est?Math.round(actual/est*100)+'%':'-')+'</b><span>Actual vs programmed ('+act.length+' with actuals)</span></div>';
+  renderTiles();
   if(!list.length){ $('histTable').innerHTML='<div class="muted" style="padding:8px 0">No saved programs yet. Press New program, build one, then Save to history.</div>'; return; }
   let h='<table style="width:100%;border-collapse:collapse"><tr><th>Number</th><th>Job</th><th style="width:110px">Status</th></tr>';
   list.forEach(e=>{ h+='<tr class="jobrow" data-id="'+esc(e.id)+'"><td class="num">'+esc(e.ref||'(no number)')+'</td><td>'+esc(e.name)+'</td><td class="muted">'+esc(e.status||'')+'</td></tr>'; });

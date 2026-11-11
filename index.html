@@ -76,6 +76,15 @@ textarea.csv{height:140px;font-family:ui-monospace,Menlo,monospace;font-size:12p
 .pvdoc .g td.c.on{background:#0b4fd4;border-left:1px solid #0b4fd4}
 .pvdoc .note{font-size:8.5pt}
 .pvdoc .two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.pvdoc .daybox{border:1px solid #dfe4ec;border-radius:8px;margin:10px 0;overflow:hidden;break-inside:avoid;page-break-inside:avoid}
+.pvdoc .dayhd{background:#eef3ff;color:#0a1a4d;font-weight:bold;padding:6px 12px;display:flex;justify-content:space-between}
+.pvdoc .tk{padding:6px 12px 8px;border-top:1px solid #dfe4ec}
+.pvdoc .tkhd{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;margin-bottom:3px}
+.pvdoc .tag{font-size:7.5pt;text-transform:uppercase;letter-spacing:.08em;font-weight:bold;color:#fff;background:#0b4fd4;border-radius:4px;padding:1px 6px}
+.pvdoc .tag.dj{background:#0a1a4d}
+.pvdoc .tk ul{list-style:none;padding-left:0;margin:2px 0 0}
+.pvdoc .tk li{padding-left:20px;position:relative;margin-bottom:2px}
+.pvdoc .tk li:before{content:"";position:absolute;left:0;top:3px;width:11px;height:11px;border:1.5px solid #0a1a4d;border-radius:2px}
 .pvdoc .foot{margin-top:14px;border-top:1px solid #dfe4ec;padding-top:8px;font-size:8.5pt;color:#6b7688}
 .jobrow{cursor:pointer}.jobrow:hover td{background:var(--b50)}
 .jobrow .num{font-family:'Newsreader',Georgia,serif;font-size:18px;color:var(--navy);font-weight:500;text-align:left}
@@ -107,7 +116,7 @@ textarea.csv{height:140px;font-family:ui-monospace,Menlo,monospace;font-size:12p
 <div class="row" style="margin:10px 0"><div style="width:320px"><label>GitHub token (fine-grained, Contents read and write on vp-program-builder only)</label><input id="ghtoken" type="password" placeholder="github_pat_..." autocomplete="off"></div><button class="ghost small" id="saveTok">Save token in this browser</button><button class="ghost small" id="clearTok">Remove token</button><button class="ghost small" id="refreshHist">Refresh list</button><button class="ghost small" id="copyHist">Copy list as CSV</button></div></details>
 </section></div>
 <div id="detailView" hidden>
-<div class="row" style="margin-bottom:12px;align-items:center"><button class="ghost" id="backBtn">Back to list</button><h2 id="detailTitle" style="flex:1;margin:0 8px"></h2><button id="previewBtn">Preview for builder</button><button class="danger" id="delBtn">Delete</button></div>
+<div class="row" style="margin-bottom:12px;align-items:center"><button class="ghost" id="backBtn">Back to list</button><h2 id="detailTitle" style="flex:1;margin:0 8px"></h2><button class="ghost" id="tasksBtn">Preview for daily tasks</button><button id="previewBtn">Preview for builder</button><button class="danger" id="delBtn">Delete</button></div>
 <div class="tiles" id="hTiles"></div>
 
 <section class="card">
@@ -161,6 +170,10 @@ textarea.csv{height:140px;font-family:ui-monospace,Menlo,monospace;font-size:12p
 <div class="note">Paste into Excel or Simpro notes.</div>
 </details>
 </section>
+</div>
+<div id="tasksView" hidden>
+<div class="pvbar row" style="margin-bottom:12px"><button class="ghost" id="tkBack">Back to program</button><button id="tkPdf">Download PDF</button><span class="muted" id="tkMsg">Day by day task sheet for the site team. Internal, not for the builder.</span></div>
+<div id="tasksDoc"></div>
 </div>
 <div id="previewView" hidden>
 <div class="pvbar row" style="margin-bottom:12px"><button class="ghost" id="pvBack">Back to program</button><button id="pvPrint">Download PDF</button><span class="muted" id="pvMsg">This is the version for the builder. It shows no hours, crew sizes or costs.</span></div>
@@ -477,7 +490,7 @@ function nextMonday(){ const d=new Date(); d.setDate(d.getDate()+((8-d.getDay())
 function blankProgram(){
   return Object.assign({name:'',ref:'',start:nextMonday(),own:2,djb:1,hpd:7.6,diff:1,closures:DEFAULT.closures,status:'Quoted',notes:'',areas:[{id:'a'+Date.now(),name:'Area 1',units:1,job:false,lines:[]}]},JSON.parse(JSON.stringify(EXTRAS)));
 }
-function showView(v){ ['list','detail','preview'].forEach(k=>$(k+'View').hidden=(k!==v)); window.scrollTo(0,0); }
+function showView(v){ ['list','detail','preview','tasks'].forEach(k=>$(k+'View').hidden=(k!==v)); window.scrollTo(0,0); }
 function openJob(id){
   const e=HIST.find(x=>x.id===id); if(!e) return;
   let st; try{ st=JSON.parse(e.stateJson); }catch(x){ return; }
@@ -515,6 +528,67 @@ function renderPreview(){
    '<div class="foot">Victorian Projects, Unit 2, 9 Industry Boulevard, Carrum Downs VIC 3201 &nbsp;|&nbsp; (03) 9798 7780 &nbsp;|&nbsp; admin@victorianprojects.com.au<br>This summary accompanies proposal '+esc(S.ref)+' and is subject to its terms and the conditions above.</div></div>';
   showView('preview');
 }
+const STAGE_ORDER=['Site setup','Demolition','Rough in','Fit off','Commissioning'];
+function renderTasks(){
+  const rows=build(), p=plan(rows);
+  if(!p.tasks.length){ $('tasksDoc').innerHTML='<div class="pvdoc">Add areas and lines first.</div>'; showView('tasks'); return; }
+  const cs=p.cs, fin=p.tasks.reduce((m,t)=>(!m||t.finish>m)?t.finish:m,null);
+  const days=[]; let x=firstWork(p.start0,cs); while(x<=fin){ days.push(new Date(x)); x=nextWork(x,cs); }
+  const fq=n=>String(Math.round(n*10)/10), fh=n=>(Math.round(n*10)/10).toFixed(1).replace(/\.0$/,'');
+  const dl=d=>d.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
+  const taskRows=t=>{
+    let r;
+    if(t.id==='S1') r=rows.filter(q=>q.who==='VP'&&(q.stage==='Site setup'||(q.job&&q.stage!=='Commissioning')));
+    else if(t.id==='C1') r=rows.filter(q=>q.stage==='Commissioning');
+    else if(t.who==='VP') r=rows.filter(q=>q.aid===t.aid&&q.who==='VP'&&q.stage!=='Commissioning'&&q.stage!=='Site setup');
+    else r=rows.filter(q=>q.aid===t.aid&&q.who==='DJB');
+    return r.map((q,i)=>({q,i})).sort((a,b)=>(STAGE_ORDER.indexOf(a.q.stage)-STAGE_ORDER.indexOf(b.q.stage))||(a.i-b.i)).map(o=>o.q);
+  };
+  const plans=p.tasks.map(t=>{
+    const r=taskRows(t), H=r.reduce((s,q)=>s+q.total,0), d=t.days||1;
+    const dayList=days.filter(dd=>dd>=t.start&&dd<=t.finish);
+    const per=dayList.map((dd,k)=>{
+      const lo=k*H/d, hi=(k+1)*H/d, items=[]; let c=0;
+      r.forEach(q=>{ const a=c, b=c+q.total; c=b; if(q.total<=0) return; const f=x=>Math.max(0,Math.min(1,(x-a)/(b-a))), whole=Math.abs(q.qty-Math.round(q.qty))<1e-9, at=x=>whole?Math.round(f(x)*q.qty):Math.round(f(x)*q.qty*10)/10; const part=Math.round((at(hi)-at(lo))*10)/10; if(part>0) items.push({n:q.item,qty:part,tot:q.qty,st:q.stage}); });
+      return {date:dd,target:H/d,items};
+    });
+    return {t,per,d:dayList.length};
+  });
+  const units=S.areas.filter(a=>!a.job).reduce((s,a)=>s+(+a.units||0),0);
+  const boxes=days.map((dd,i)=>{
+    const act=[]; plans.forEach(pl=>{ const k=pl.per.findIndex(z=>iso(z.date)===iso(dd)); if(k>=0) act.push({pl,k,z:pl.per[k]}); });
+    if(!act.length) return '';
+    const body=act.map(({pl,k,z})=>{
+      const t=pl.t, dj=t.who==='DJB', crew=dj?'DJB Electrical':'Our crew';
+      const nm=t.id==='S1'?'Site setup and job-level items':t.id==='C1'?'Commission and balance, handover':t.name.replace(/: (our crew|DJB Electrical)$/,'');
+      const items=z.items.length?z.items.map(it=>'<li><b>'+(Math.abs(it.qty-it.tot)<0.05?fq(it.tot):fq(it.qty)+' of '+fq(it.tot))+' &times;</b> '+esc(it.n)+' <span class="muted">'+esc(it.st)+'</span></li>').join(''):'<li>Finish off, tidy up and check the area</li>';
+      return '<div class="tk"><div class="tkhd"><span class="tag'+(dj?' dj':'')+'">'+crew+'</span><b>'+esc(nm)+'</b><span class="muted">day '+(k+1)+' of '+pl.d+', target about '+fh(z.target)+' hours</span></div><ul>'+items+'</ul></div>';
+    }).join('');
+    return '<div class="daybox"><div class="dayhd"><span>Day '+(i+1)+'</span><span>'+esc(dl(dd))+'</span></div>'+body+'</div>';
+  }).join('');
+  const dstr=new Date().toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'});
+  $('tasksDoc').innerHTML='<div class="pvdoc"><div class="top"><div class="eb">Victorian Projects, mechanical services</div><h1>Daily task sheet</h1><p>'+esc(S.name)+'</p></div>'+
+   '<div class="meta"><div><span>Reference</span><b>'+esc(S.ref)+'</b></div><div><span>On site from</span><b>'+esc(dl(days[0]))+'</b></div><div><span>Finish</span><b>'+esc(dl(fin))+'</b></div><div><span>Crew</span><b>Ours '+(+S.own||0)+', DJB '+(+S.djb||0)+'</b></div></div>'+
+   '<div class="note muted" style="margin:8px 0">Internal sheet for the site team, not for the builder. Hours are targets from the Estimating Guideline ('+units+' '+esc(S.unitLabel||'units')+', '+days.length+' working days). Tick each item off as it is done, and tell the PM the same day if a day is falling behind. Printed '+esc(dstr)+'.</div>'+
+   boxes+
+   '<div class="foot">Victorian Projects, Unit 2, 9 Industry Boulevard, Carrum Downs VIC 3201 &nbsp;|&nbsp; (03) 9798 7780</div></div>';
+  showView('tasks');
+}
+$('tasksBtn').onclick=renderTasks;
+$('tkBack').onclick=()=>showView('detail');
+$('tkPdf').onclick=async()=>{
+  const btn=$('tkPdf'), msg=$('tkMsg'), el=document.querySelector('#tasksDoc .pvdoc'); if(!el) return;
+  btn.disabled=true; msg.textContent='Making the PDF...';
+  var oldCss=el.style.cssText;
+  try{
+    await loadH2P();
+    el.style.boxShadow='none'; el.style.border='0'; el.style.borderRadius='0';
+    const name=((S.ref||'Program')+' Daily task sheet.pdf').replace(/[\\/:*?"<>|]/g,'-');
+    await html2pdf().set({margin:[10,10,12,10],image:{type:'jpeg',quality:0.98},html2canvas:{scale:2.5,backgroundColor:'#ffffff',useCORS:true},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css'],avoid:['.daybox','.top','.meta']}}).from(el).save(name);
+    msg.textContent='Saved '+name+' to your downloads.';
+  }catch(e){ msg.textContent='Could not make the PDF: '+((e&&e.message)||'blocked'); }
+  el.style.cssText=oldCss; btn.disabled=false;
+};
 $('newProg').onclick=()=>{ S=blankProgram(); openDetail(); };
 $('backBtn').onclick=()=>{ showView('list'); renderHistory(); };
 $('previewBtn').onclick=renderPreview;

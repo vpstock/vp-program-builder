@@ -107,7 +107,7 @@ textarea.csv{height:140px;font-family:ui-monospace,Menlo,monospace;font-size:12p
 <div class="row" style="margin:10px 0"><div style="width:320px"><label>GitHub token (fine-grained, Contents read and write on vp-program-builder only)</label><input id="ghtoken" type="password" placeholder="github_pat_..." autocomplete="off"></div><button class="ghost small" id="saveTok">Save token in this browser</button><button class="ghost small" id="clearTok">Remove token</button><button class="ghost small" id="refreshHist">Refresh list</button><button class="ghost small" id="copyHist">Copy list as CSV</button></div></details>
 </section></div>
 <div id="detailView" hidden>
-<div class="row" style="margin-bottom:12px;align-items:center"><button class="ghost" id="backBtn">Back to list</button><h2 id="detailTitle" style="flex:1;margin:0 8px"></h2><button id="previewBtn">Preview for builder</button><button class="danger" id="delBtn">Delete</button></div>
+<div class="row" style="margin-bottom:12px;align-items:center"><button class="ghost" id="backBtn">Back to list</button><h2 id="detailTitle" style="flex:1;margin:0 8px"></h2><label style="display:flex;gap:8px;align-items:center;font-weight:600;margin:0 12px 0 0;white-space:nowrap;cursor:pointer"><input type="checkbox" id="approved" style="width:auto;margin:0"> Approved, move to Jobs</label><button id="previewBtn">Preview for builder</button><button class="danger" id="delBtn">Delete</button></div>
 <div class="tiles" id="hTiles"></div>
 
 <section class="card">
@@ -128,7 +128,6 @@ textarea.csv{height:140px;font-family:ui-monospace,Menlo,monospace;font-size:12p
 </div>
 <div class="row" style="margin-top:12px">
 <div style="width:180px"><label>Status</label><select id="status" class="in"><option>Quoted</option><option>Won</option><option>In progress</option><option>Complete</option><option>Lost</option></select></div>
-<div style="width:230px"><label>Approved</label><label style="display:flex;gap:8px;align-items:center;font-weight:600;padding:9px 0"><input type="checkbox" id="approved" style="width:auto"> Quote approved, move to Jobs</label></div>
 <div style="flex:1;min-width:260px"><label>Notes (what was asked, builder, anything worth remembering)</label><input id="notes" class="in" type="text"></div>
 <button id="saveHist">Save to history</button><button class="ghost" id="saveNew">Save as new entry</button>
 </div>

@@ -143,6 +143,13 @@ textarea.csv{height:140px;font-family:ui-monospace,Menlo,monospace;font-size:12p
 <div class="note" id="saveMsg"></div>
 </section>
 
+<section class="card" id="attCard">
+<h2>Attachments</h2>
+<label id="attDrop" style="display:block;border:2px dashed #b9c6e6;border-radius:8px;padding:18px;text-align:center;background:#f7f9ff;cursor:pointer;color:#0a1a4d;font-weight:600">Drop the quote files here, or click to choose<input id="attInput" type="file" multiple style="display:none"></label>
+<div class="note" id="attMsg">Files upload as soon as you add them, and stay with this quote.</div>
+<div id="attList"></div>
+</section>
+
 <section class="card">
 <div class="row" style="justify-content:space-between;margin-bottom:8px"><h2>Areas and quantities</h2>
 <div class="row"><button id="addArea">Add area</button><button class="ghost" id="addJob">Add job-level area</button></div></div>
@@ -171,6 +178,11 @@ textarea.csv{height:140px;font-family:ui-monospace,Menlo,monospace;font-size:12p
 </details>
 </section>
 </div>
+<div id="attModal" hidden style="position:fixed;inset:0;background:rgba(10,26,77,.65);z-index:50;padding:3vh 3vw">
+<div style="background:#fff;border-radius:8px;height:100%;display:flex;flex-direction:column;overflow:hidden">
+<div class="row" style="padding:10px 14px;border-bottom:1px solid #dfe4ec;align-items:center"><b id="attTitle" style="flex:1"></b><button class="ghost" id="attDl">Download</button><button id="attClose">Close</button></div>
+<div id="attBody" style="flex:1;overflow:auto;background:#f7f8fa;display:flex;align-items:center;justify-content:center"></div>
+</div></div>
 <div id="tasksView" hidden>
 <div class="pvbar row" style="margin-bottom:12px"><button class="ghost" id="tkBack">Back to program</button><button id="tkPdf">Download PDF</button><span class="muted" id="tkMsg">Day by day task sheet for the site team. Internal, not for the builder.</span></div>
 <div id="tasksDoc"></div>
@@ -421,11 +433,11 @@ function snapshotDoc(){
   const keep=JSON.parse(JSON.stringify(S)); delete keep.hid;
   return {name:S.name||'Untitled',ref:S.ref||'',status:S.status||'Quoted',notes:S.notes||'',savedAt:new Date().toISOString(),
     units:LAST.units,vp:Math.round(LAST.vp*100)/100,djb:Math.round(LAST.djb*100)/100,days:LAST.days,finish:LAST.finish,
-    actualVp:(S.actualVp===''||S.actualVp==null)?null:+S.actualVp,actualDjb:(S.actualDjb===''||S.actualDjb==null)?null:+S.actualDjb,stateJson:JSON.stringify(keep)};
+    files:S.files||[],actualVp:(S.actualVp===''||S.actualVp==null)?null:+S.actualVp,actualDjb:(S.actualDjb===''||S.actualDjb==null)?null:+S.actualDjb,stateJson:JSON.stringify(keep)};
 }
 async function saveHist(asNew){
   const id=(!asNew&&S.hid)?S.hid:('p'+Date.now().toString(36)+Math.random().toString(36).slice(2,6));
-  const doc=snapshotDoc(); const rec=Object.assign({id},doc);
+  if(asNew) S.files=[]; const doc=snapshotDoc(); const rec=Object.assign({id},doc);
   try{
     if(hmode==='github'){ await ghMutate(l=>{ const i=l.findIndex(h=>h.id===id); if(i>=0) l[i]=rec; else l.unshift(rec); return l; },'Save program: '+doc.name); }
     else { const i=HIST.findIndex(h=>h.id===id); if(i>=0) HIST[i]=rec; else HIST.unshift(rec); histLocalSave(); renderHistory(); }
@@ -494,10 +506,10 @@ function showView(v){ ['list','detail','preview','tasks'].forEach(k=>$(k+'View')
 function openJob(id){
   const e=HIST.find(x=>x.id===id); if(!e) return;
   let st; try{ st=JSON.parse(e.stateJson); }catch(x){ return; }
-  S=Object.assign(JSON.parse(JSON.stringify(EXTRAS)),st); S.hid=id; S.status=e.status; S.notes=e.notes; S.actualVp=e.actualVp; S.actualDjb=e.actualDjb;
+  S=Object.assign(JSON.parse(JSON.stringify(EXTRAS)),st); S.hid=id; S.status=e.status; S.notes=e.notes; S.actualVp=e.actualVp; S.actualDjb=e.actualDjb; S.files=e.files||[];
   openDetail();
 }
-function openDetail(){ renderSettings(); renderAreas(); recalc(); $('detailTitle').textContent=(S.ref||'New program')+(S.name?'  '+S.name:''); $('saveMsg').textContent=''; $('delBtn').style.display=S.hid?'':'none'; showView('detail'); }
+function openDetail(){ renderSettings(); renderAreas(); recalc(); renderAttach(); $('detailTitle').textContent=(S.ref||'New program')+(S.name?'  '+S.name:''); $('saveMsg').textContent=''; $('delBtn').style.display=S.hid?'':'none'; showView('detail'); }
 function lines(s){ return String(s||'').split('\n').map(x=>x.trim()).filter(Boolean); }
 function renderPreview(){
   const rows=build(), p=plan(rows);
@@ -589,6 +601,88 @@ $('tkPdf').onclick=async()=>{
   }catch(e){ msg.textContent='Could not make the PDF: '+((e&&e.message)||'blocked'); }
   el.style.cssText=oldCss; btn.disabled=false;
 };
+
+const AT_MAX=25*1024*1024;
+function safeName(n){ return String(n).replace(/[^A-Za-z0-9._-]+/g,'-').replace(/^-+|-+$/g,'')||'file'; }
+function fmtSize(b){ return b>1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB'; }
+function fileType(n,t){ if(t) return t; const e=(n.split('.').pop()||'').toLowerCase(); return ({pdf:'application/pdf',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',webp:'image/webp'})[e]||'application/octet-stream'; }
+function idb(){ return new Promise((ok,no)=>{ const r=indexedDB.open('vp-pb-files',1); r.onupgradeneeded=()=>r.result.createObjectStore('f'); r.onsuccess=()=>ok(r.result); r.onerror=()=>no(r.error); }); }
+async function idbPut(k,v){ const db=await idb(); return new Promise((ok,no)=>{ const t=db.transaction('f','readwrite'); t.objectStore('f').put(v,k); t.oncomplete=ok; t.onerror=()=>no(t.error); }); }
+async function idbGet(k){ const db=await idb(); return new Promise((ok,no)=>{ const q=db.transaction('f').objectStore('f').get(k); q.onsuccess=()=>ok(q.result); q.onerror=()=>no(q.error); }); }
+async function idbDel(k){ const db=await idb(); return new Promise((ok,no)=>{ const t=db.transaction('f','readwrite'); t.objectStore('f').delete(k); t.oncomplete=ok; t.onerror=()=>no(t.error); }); }
+function toB64(file){ return new Promise((ok,no)=>{ const r=new FileReader(); r.onload=()=>ok(String(r.result).split(',')[1]); r.onerror=()=>no(r.error); r.readAsDataURL(file); }); }
+const ghFileUrl=path=>'https://api.github.com/repos/'+GH.owner+'/'+GH.repo+'/contents/'+path.split('/').map(encodeURIComponent).join('/');
+async function ghPutFile(path,file){
+  const r=await fetch(ghFileUrl(path),{method:'PUT',headers:{Authorization:'Bearer '+ghToken(),Accept:'application/vnd.github+json','Content-Type':'application/json'},body:JSON.stringify({message:'Attach '+file.name,branch:GH.branch,content:await toB64(file)})});
+  if(!r.ok) throw new Error('GitHub '+r.status);
+}
+async function ghDelFile(path){
+  const h={Authorization:'Bearer '+ghToken(),Accept:'application/vnd.github+json'};
+  const g=await fetch(ghFileUrl(path)+'?ref='+GH.branch,{headers:h}); if(g.status===404) return; if(!g.ok) throw new Error('GitHub '+g.status);
+  const sha=(await g.json()).sha;
+  const r=await fetch(ghFileUrl(path),{method:'DELETE',headers:Object.assign({'Content-Type':'application/json'},h),body:JSON.stringify({message:'Remove attachment',sha,branch:GH.branch})});
+  if(!r.ok) throw new Error('GitHub '+r.status);
+}
+async function atBlob(f){
+  if(f.local){ const b=await idbGet(f.path); if(!b) throw new Error('This file was saved in another browser'); return b; }
+  const tok=ghToken();
+  const r=await fetch(ghFileUrl(f.path)+'?ref='+GH.branch,{headers:Object.assign({Accept:'application/vnd.github.raw'},tok?{Authorization:'Bearer '+tok}:{})});
+  if(!r.ok) throw new Error('GitHub '+r.status);
+  return new Blob([await r.blob()],{type:fileType(f.name,f.type)});
+}
+let attUrl='';
+function closeAtt(){ $('attModal').hidden=true; $('attBody').innerHTML=''; if(attUrl){ URL.revokeObjectURL(attUrl); attUrl=''; } }
+function saveBlob(blob,name){ const u=URL.createObjectURL(blob), a=document.createElement('a'); a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),4000); }
+async function previewAtt(i){
+  const f=(S.files||[])[i]; if(!f) return; $('attMsg').textContent='Opening '+f.name+'...';
+  try{
+    const blob=await atBlob(f); const t=fileType(f.name,f.type); attUrl=URL.createObjectURL(blob);
+    $('attTitle').textContent=f.name; $('attDl').onclick=()=>saveBlob(blob,f.name);
+    $('attBody').innerHTML=''; let el;
+    if(t==='application/pdf'){ el=document.createElement('iframe'); el.src=attUrl; el.style.cssText='border:0;width:100%;height:100%'; }
+    else if(t.indexOf('image/')===0){ el=document.createElement('img'); el.src=attUrl; el.style.cssText='max-width:100%;max-height:100%'; }
+    else { el=document.createElement('div'); el.style.cssText='padding:30px;text-align:center'; el.textContent='No preview for this file type. Use Download to open it.'; }
+    $('attBody').appendChild(el); $('attModal').hidden=false; $('attMsg').textContent='';
+  }catch(e){ $('attMsg').textContent='Could not open the file: '+((e&&e.message)||'blocked'); }
+}
+function renderAttach(){
+  const fs=S.files||[]; let h='';
+  if(!fs.length) h='<div class="muted" style="padding:8px 0">Nothing attached yet.</div>';
+  else{ h='<table style="width:100%;border-collapse:collapse"><tr><th>File</th><th style="width:90px">Size</th><th style="width:110px">Added</th><th style="width:250px"></th></tr>';
+    fs.forEach((f,i)=>{ h+='<tr><td>'+esc(f.name)+(f.local?' <span class="muted">(this browser only)</span>':'')+'</td><td class="muted">'+esc(fmtSize(f.size||0))+'</td><td class="muted">'+esc((f.added||'').slice(0,10))+'</td><td style="text-align:right"><button class="ghost" data-a="pv" data-i="'+i+'">Preview</button> <button class="ghost" data-a="dl" data-i="'+i+'">Download</button> <button class="danger" data-a="rm" data-i="'+i+'">Remove</button></td></tr>'; });
+    h+='</table>'; }
+  $('attList').innerHTML=h;
+  $('attList').querySelectorAll('button').forEach(b=>b.onclick=async()=>{
+    const i=+b.dataset.i, f=S.files[i];
+    if(b.dataset.a==='pv') return previewAtt(i);
+    if(b.dataset.a==='dl'){ try{ saveBlob(await atBlob(f),f.name); }catch(e){ $('attMsg').textContent='Could not download: '+((e&&e.message)||'blocked'); } return; }
+    if(!b.dataset.sure){ b.dataset.sure='1'; b.textContent='Sure? Click again'; setTimeout(()=>{ b.dataset.sure=''; b.textContent='Remove'; },3500); return; }
+    try{ if(f.local) await idbDel(f.path); else await ghDelFile(f.path); S.files.splice(i,1); await histUpdate(S.hid,{files:S.files}); renderAttach(); $('attMsg').textContent='Removed '+f.name+'.'; }catch(e){ $('attMsg').textContent='Could not remove: '+((e&&e.message)||'blocked'); }
+  });
+}
+async function addFiles(list){
+  const files=Array.from(list||[]); if(!files.length) return;
+  if(!S.hid){ $('attMsg').textContent='Saving the quote first...'; await saveHist(false); if(!S.hid){ $('attMsg').textContent='Could not save the quote, so nothing was attached.'; return; } }
+  if(!S.files) S.files=[]; let done=0;
+  for(const file of files){
+    if(file.size>AT_MAX){ $('attMsg').textContent=file.name+' is over 25 MB, so it was skipped.'; continue; }
+    $('attMsg').textContent='Uploading '+file.name+'...';
+    const path='attachments/'+S.hid+'/'+Date.now().toString(36)+'-'+safeName(file.name), local=hmode!=='github';
+    try{
+      if(local) await idbPut(path,file); else await ghPutFile(path,file);
+      S.files.push({name:file.name,path,size:file.size,type:fileType(file.name,file.type),added:new Date().toISOString(),local});
+      await histUpdate(S.hid,{files:S.files}); done++; renderAttach();
+    }catch(e){ $('attMsg').textContent='Could not upload '+file.name+': '+((e&&e.message)||'blocked'); return; }
+  }
+  if(done) $('attMsg').textContent=done+' file'+(done>1?'s':'')+' attached.'+(hmode==='github'?'':' Saved in this browser only. Add the GitHub token to upload for everyone.');
+}
+$('attInput').onchange=e=>{ addFiles(e.target.files); e.target.value=''; };
+$('attClose').onclick=closeAtt;
+$('attModal').onclick=e=>{ if(e.target===$('attModal')) closeAtt(); };
+const dz=$('attDrop');
+['dragenter','dragover'].forEach(t=>dz.addEventListener(t,e=>{ e.preventDefault(); dz.style.background='#eef3ff'; }));
+['dragleave','drop'].forEach(t=>dz.addEventListener(t,e=>{ e.preventDefault(); dz.style.background='#f7f9ff'; }));
+dz.addEventListener('drop',e=>addFiles(e.dataTransfer.files));
 $('newProg').onclick=()=>{ S=blankProgram(); openDetail(); };
 $('backBtn').onclick=()=>{ showView('list'); renderHistory(); };
 $('previewBtn').onclick=renderPreview;

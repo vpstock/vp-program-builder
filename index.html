@@ -107,7 +107,7 @@ textarea.csv{height:140px;font-family:ui-monospace,Menlo,monospace;font-size:12p
 <div class="row" style="margin:10px 0"><div style="width:320px"><label>GitHub token (fine-grained, Contents read and write on vp-program-builder only)</label><input id="ghtoken" type="password" placeholder="github_pat_..." autocomplete="off"></div><button class="ghost small" id="saveTok">Save token in this browser</button><button class="ghost small" id="clearTok">Remove token</button><button class="ghost small" id="refreshHist">Refresh list</button><button class="ghost small" id="copyHist">Copy list as CSV</button></div></details>
 </section></div>
 <div id="detailView" hidden>
-<div class="row" style="margin-bottom:12px;align-items:center"><button class="ghost" id="backBtn">Back to list</button><h2 id="detailTitle" style="flex:1;margin:0 8px"></h2><label style="display:flex;gap:8px;align-items:center;font-weight:600;margin:0 12px 0 0;white-space:nowrap;cursor:pointer"><input type="checkbox" id="approved" style="width:auto;margin:0"> Approved, move to Jobs</label><button id="previewBtn">Preview for builder</button><button class="danger" id="delBtn">Delete</button></div>
+<div class="row" style="margin-bottom:12px;align-items:center"><button class="ghost" id="backBtn">Back to list</button><h2 id="detailTitle" style="flex:1;margin:0 8px"></h2><button id="previewBtn">Preview for builder</button><button class="danger" id="delBtn">Delete</button></div>
 <div class="tiles" id="hTiles"></div>
 
 <section class="card">
@@ -459,15 +459,18 @@ function renderHistory(){
   const est=act.reduce((s,h)=>s+h.vp+h.djb,0), actual=act.reduce((s,h)=>s+(+h.actualVp||0)+(+h.actualDjb||0),0);
   renderTiles();
   if(!list.length){ $('histTable').innerHTML='<div class="muted" style="padding:8px 0">Nothing saved yet. Press New quote, build the program, then Save to history.</div>'; return; }
+  const ST=['Quoted','Won','In progress','Complete','Lost'];
+  const stSel=e=>'<select class="stsel in" data-id="'+esc(e.id)+'" style="padding:4px 6px">'+ST.map(o=>'<option'+(o===(e.status||'Quoted')?' selected':'')+'>'+o+'</option>').join('')+'</select>';
   const sec=(title,arr,empty)=>{
     let h='<h3 style="margin:14px 0 6px;font-size:16px">'+title+' <span class="muted" style="font-weight:400">('+arr.length+')</span></h3>';
     if(!arr.length) return h+'<div class="muted" style="padding:4px 0 8px">'+empty+'</div>';
-    h+='<table style="width:100%;border-collapse:collapse"><tr><th>Number</th><th>Name</th><th style="width:110px">Status</th></tr>';
-    arr.forEach(e=>{ h+='<tr class="jobrow" data-id="'+esc(e.id)+'"><td class="num">'+esc(e.ref||'(no number)')+'</td><td>'+esc(e.name)+'</td><td class="muted">'+esc(e.status||'')+'</td></tr>'; });
+    h+='<table style="width:100%;border-collapse:collapse"><tr><th>Number</th><th>Name</th><th style="width:150px">Status</th></tr>';
+    arr.forEach(e=>{ h+='<tr class="jobrow" data-id="'+esc(e.id)+'"><td class="num">'+esc(e.ref||'(no number)')+'</td><td>'+esc(e.name)+'</td><td>'+stSel(e)+'</td></tr>'; });
     return h+'</table>';
   };
-  $('histTable').innerHTML=sec('Quotes',list.filter(e=>!isJob(e.status)),'No open quotes.')+sec('Jobs',list.filter(e=>isJob(e.status)),'No approved jobs yet. Tick Approved on a quote to move it here.');
+  $('histTable').innerHTML=sec('Quotes',list.filter(e=>!isJob(e.status)),'No open quotes.')+sec('Jobs',list.filter(e=>isJob(e.status)),'No approved jobs yet. Change a quote status to Won to move it here.');
   $('histTable').querySelectorAll('tr.jobrow').forEach(tr=>tr.onclick=()=>openJob(tr.dataset.id));
+  $('histTable').querySelectorAll('select.stsel').forEach(sl=>{ sl.onclick=ev=>ev.stopPropagation(); sl.onchange=ev=>{ ev.stopPropagation(); histUpdate(sl.dataset.id,{status:sl.value}); }; });
 }
 const EXTRAS={builder:'',pm:'',unitLabel:'units',glance:'',needs:'Access to each area when we need it, with ceilings left open until our work is in.\nSite access, lay down area, and temporary power and lighting.\nYour nominated program.',conds:'Start is on written approval of price and time.\nNormal working hours, no after hours work. Durations assume continuous access.\nOur crew is closed from 23 December to 5 January, and this is not counted in the working days.\nMaterial lead times may affect the start.',actualVp:null,actualDjb:null};
 function nextMonday(){ const d=new Date(); d.setDate(d.getDate()+((8-d.getDay())%7||7)); return iso(d); }
@@ -531,11 +534,9 @@ $('saveHist').onclick=()=>saveHist(false);
 $('saveNew').onclick=()=>saveHist(true);
 $('hq').oninput=renderHistory;
 $('copyHist').onclick=async()=>{ try{ await navigator.clipboard.writeText(histCsv()); $('histNote').textContent='History copied as CSV.'; }catch(e){ $('csv').value=histCsv(); $('csv').select(); $('histNote').textContent='Copy blocked here. The history CSV is in the box under Copy out, press Ctrl+C.'; } };
-function setStatus(v){ S.status=v; $('status').value=v; $('approved').checked=isJob(v); save(); if(S.hid){ histUpdate(S.hid,{status:v}); $('saveMsg').textContent=isJob(v)?'Approved. Moved to Jobs.':'Moved back to Quotes.'; } }
-$('status').onchange=e=>setStatus(e.target.value);
-$('approved').onchange=e=>setStatus(e.target.checked?(isJob(S.status)?S.status:'Won'):'Quoted');
+$('status').onchange=e=>{ S.status=e.target.value; save(); if(S.hid) histUpdate(S.hid,{status:S.status}); };
 $('notes').oninput=e=>{ S.notes=e.target.value; save(); };
-function syncMeta(){ $('status').value=S.status||'Quoted'; $('approved').checked=isJob(S.status); $('notes').value=S.notes||''; $('glance').value=S.glance||''; $('needs').value=S.needs||''; $('conds').value=S.conds||''; $('actVp').value=S.actualVp==null?'':S.actualVp; $('actDjb').value=S.actualDjb==null?'':S.actualDjb; }
+function syncMeta(){ $('status').value=S.status||'Quoted'; $('notes').value=S.notes||''; $('glance').value=S.glance||''; $('needs').value=S.needs||''; $('conds').value=S.conds||''; $('actVp').value=S.actualVp==null?'':S.actualVp; $('actDjb').value=S.actualDjb==null?'':S.actualDjb; }
 ['glance','needs','conds'].forEach(k=>$(k).oninput=e=>{S[k]=e.target.value;save();});
 $('actVp').oninput=e=>{S.actualVp=e.target.value===''?null:+e.target.value;save();};
 $('actDjb').oninput=e=>{S.actualDjb=e.target.value===''?null:+e.target.value;save();};

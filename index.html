@@ -155,10 +155,11 @@ textarea.csv{height:140px;font-family:ui-monospace,Menlo,monospace;font-size:12p
 </section>
 
 <section class="card">
-<h2>Copy out</h2>
+<details id="copyOut"><summary style="cursor:pointer;list-style:none"><h2 style="display:inline">Copy out</h2> <span class="muted">click to open</span></summary>
 <div class="row"><button id="copyCsv">Copy program and hours as CSV</button><span class="muted" id="copyMsg"></span></div>
 <textarea class="csv" id="csv" readonly style="margin-top:8px"></textarea>
 <div class="note">Paste into Excel or Simpro notes.</div>
+</details>
 </section>
 </div>
 <div id="previewView" hidden>

@@ -548,7 +548,7 @@ function renderTasks(){
     const r=taskRows(t), H=r.reduce((s,q)=>s+q.total,0), d=t.days||1;
     const dayList=days.filter(dd=>dd>=t.start&&dd<=t.finish);
     const per=dayList.map((dd,k)=>{
-      const lo=k*H/d, hi=(k+1)*H/d, items=[]; let c=0;
+      const C=Math.max(0.01,(t.people||1)*(+S.hpd||7.6)/(+S.diff||1)), lo=Math.min(k*C,H), hi=(k>=d-1)?H:Math.min((k+1)*C,H), items=[]; let c=0;
       r.forEach(q=>{ const a=c, b=c+q.total; c=b; if(q.total<=0) return; const f=x=>Math.max(0,Math.min(1,(x-a)/(b-a))), whole=Math.abs(q.qty-Math.round(q.qty))<1e-9, at=x=>whole?Math.round(f(x)*q.qty):Math.round(f(x)*q.qty*10)/10; const part=Math.round((at(hi)-at(lo))*10)/10; if(part>0) items.push({n:q.item,qty:part,tot:q.qty,st:q.stage}); });
       return {date:dd,target:H/d,items};
     });
@@ -562,14 +562,14 @@ function renderTasks(){
       const t=pl.t, dj=t.who==='DJB', crew=dj?'DJB Electrical':'Our crew';
       const nm=t.id==='S1'?'Site setup and job-level items':t.id==='C1'?'Commission and balance, handover':t.name.replace(/: (our crew|DJB Electrical)$/,'');
       const items=z.items.length?z.items.map(it=>'<li><b>'+(Math.abs(it.qty-it.tot)<0.05?fq(it.tot):fq(it.qty)+' of '+fq(it.tot))+' &times;</b> '+esc(it.n)+' <span class="muted">'+esc(it.st)+'</span></li>').join(''):'<li>Finish off, tidy up and check the area</li>';
-      return '<div class="tk"><div class="tkhd"><span class="tag'+(dj?' dj':'')+'">'+crew+'</span><b>'+esc(nm)+'</b><span class="muted">day '+(k+1)+' of '+pl.d+', target about '+fh(z.target)+' hours</span></div><ul>'+items+'</ul></div>';
+      return '<div class="tk"><div class="tkhd"><span class="tag'+(dj?' dj':'')+'">'+crew+'</span><b>'+esc(nm)+'</b><span class="muted">day '+(k+1)+' of '+pl.d+'</span></div><ul>'+items+'</ul></div>';
     }).join('');
     return '<div class="daybox"><div class="dayhd"><span>Day '+(i+1)+'</span><span>'+esc(dl(dd))+'</span></div>'+body+'</div>';
   }).join('');
   const dstr=new Date().toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'});
   $('tasksDoc').innerHTML='<div class="pvdoc"><div class="top"><div class="eb">Victorian Projects, mechanical services</div><h1>Daily task sheet</h1><p>'+esc(S.name)+'</p></div>'+
-   '<div class="meta"><div><span>Reference</span><b>'+esc(S.ref)+'</b></div><div><span>On site from</span><b>'+esc(dl(days[0]))+'</b></div><div><span>Finish</span><b>'+esc(dl(fin))+'</b></div><div><span>Crew</span><b>Ours '+(+S.own||0)+', DJB '+(+S.djb||0)+'</b></div></div>'+
-   '<div class="note muted" style="margin:8px 0">Internal sheet for the site team, not for the builder. Hours are targets from the Estimating Guideline ('+units+' '+esc(S.unitLabel||'units')+', '+days.length+' working days). Tick each item off as it is done, and tell the PM the same day if a day is falling behind. Printed '+esc(dstr)+'.</div>'+
+   '<div class="meta"><div><span>Reference</span><b>'+esc(S.ref)+'</b></div><div><span>On site from</span><b>'+esc(dl(days[0]))+'</b></div><div><span>Finish</span><b>'+esc(dl(fin))+'</b></div><div><span>Working days</span><b>'+days.length+'</b></div></div>'+
+   '<div class="note muted" style="margin:8px 0">Internal sheet for the site team, not for the builder. Each day is a full day of work, taken from the Estimating Guideline ('+units+' '+esc(S.unitLabel||'units')+'). Tick each item off as it is done, and tell the PM the same day if a day is falling behind. Printed '+esc(dstr)+'.</div>'+
    boxes+
    '<div class="foot">Victorian Projects, Unit 2, 9 Industry Boulevard, Carrum Downs VIC 3201 &nbsp;|&nbsp; (03) 9798 7780</div></div>';
   showView('tasks');

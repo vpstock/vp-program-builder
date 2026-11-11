@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Victorian Projects program builder</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:wght@500&family=Public+Sans:wght@400;600&display=swap">
+<style>
+:root{--royal:#0b4fd4;--navy:#0a1a4d;--cyan:#12aef4;--n50:#f7f8fa;--char:#14181e;--body:#333b47;--muted:#6b7688;--hair:#dfe4ec;--b50:#eef3ff;--amber:#b45309}
+*{box-sizing:border-box}
+body{margin:0;background:var(--n50);color:var(--body);font:14px/1.45 'Public Sans',Arial,sans-serif}
+h1,h2,h3{font-family:'Newsreader',Georgia,serif;font-weight:500;color:var(--navy);margin:0}
+header{background:var(--navy);color:#fff;padding:20px 32px}
+header h1{color:#fff;font-size:28px}
+header p{margin:4px 0 0;color:#c9d4f5}
+.eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan);font-weight:600}
+main{max-width:1280px;margin:0 auto;padding:24px 32px 64px}
+.card{background:#fff;border:1px solid var(--hair);border-radius:8px;padding:16px 20px;margin-bottom:16px}
+.card h2{font-size:20px;margin-bottom:12px}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+label{display:block;font-size:12px;font-weight:600;color:var(--char);margin-bottom:4px}
+input,select,textarea,button{font:inherit}
+input,select,textarea{width:100%;border:1px solid var(--hair);border-radius:8px;padding:7px 9px;background:#fff;color:var(--char)}
+input.in,select.in,textarea.in{background:var(--b50);color:#0b3aa0;font-weight:600}
+button{border:0;border-radius:8px;padding:8px 14px;background:var(--royal);color:#fff;font-weight:600;cursor:pointer}
+button.ghost{background:#fff;color:var(--royal);border:1px solid var(--royal)}
+button.small{padding:4px 9px;font-size:12px}
+button.danger{background:#fff;color:#b42318;border:1px solid #f1c0bb}
+.row{display:flex;gap:8px;align-items:end;flex-wrap:wrap}
+.area{border:1px solid var(--hair);border-radius:8px;margin-bottom:12px;overflow:hidden}
+.area>.ah{background:var(--b50);padding:10px 14px;display:flex;gap:10px;align-items:end;flex-wrap:wrap}
+.area table{width:100%;border-collapse:collapse}
+th{background:var(--navy);color:#fff;text-align:left;font-size:12px;padding:6px 8px;font-weight:600}
+td{padding:5px 8px;border-bottom:1px solid var(--hair);vertical-align:middle}
+td input,td select{padding:4px 6px}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.tag{display:inline-block;border-radius:99px;padding:1px 8px;font-size:11px;font-weight:600}
+.tag.VP{background:var(--royal);color:#fff}.tag.DJB{background:var(--cyan);color:var(--navy)}
+.custom{color:var(--amber);font-weight:600;font-size:11px}
+.tiles{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-bottom:12px}
+.tile{background:var(--b50);border-radius:8px;padding:10px 14px}
+.tile b{display:block;font-family:'Newsreader',Georgia,serif;font-size:26px;color:var(--navy);font-weight:500}
+.tile span{font-size:12px;color:var(--muted)}
+.gantt{overflow-x:auto;border:1px solid var(--hair);border-radius:8px}
+.gantt table{border-collapse:collapse;font-size:11px;min-width:100%}
+.gantt th.d{padding:2px 0;min-width:22px;text-align:center}
+.gantt td.c{padding:0;min-width:22px;height:22px;border-left:1px solid #eef0f4}
+.gantt td.c.VP{background:var(--royal)}.gantt td.c.DJB{background:var(--cyan)}
+.gantt td.l,.gantt th.l{position:sticky;left:0;background:#fff;z-index:1;min-width:300px;white-space:nowrap;font-size:12px}
+.gantt th.l{background:var(--navy)}
+.muted{color:var(--muted);font-size:12px}
+.note{font-size:12px;color:var(--muted);margin-top:8px}
+.warn{background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:8px 12px;margin-top:8px;font-size:12px;color:#7c2d12}
+textarea.csv{height:140px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+</style>
+</head>
+<body>
+<header>
+<div class="eyebrow">Victorian Projects</div>
+<h1>Program builder</h1>
+<p>Pick the items from the estimating guideline, enter the quantities, and get the hours and a program. Loaded with PVP-1126-D, 459 Little Collins Street.</p>
+</header>
+<main>
+<section class="card">
+<h2>Job and settings</h2>
+<div class="grid" id="settings"></div>
+<div class="note">Blue cells are inputs. Hours come straight from the guideline (Estimating Guideline, approved 19 Oct 2026, proposed hours where one exists). Change quantities, never the hours. A custom line is flagged and needs a reason.</div>
+<div class="row" style="margin-top:12px">
+<div style="flex:1;min-width:260px"><label>Days the crew is not working (one date per line, YYYY-MM-DD, weekends are skipped automatically)</label><textarea id="closures" class="in" rows="5"></textarea></div>
+</div>
+<div class="row" style="margin-top:12px">
+<div style="width:180px"><label>Status</label><select id="status" class="in"><option>Quoted</option><option>Won</option><option>In progress</option><option>Complete</option><option>Lost</option></select></div>
+<div style="flex:1;min-width:260px"><label>Notes (what was asked, builder, anything worth remembering)</label><input id="notes" class="in" type="text"></div>
+<button id="saveHist">Save to history</button><button class="ghost" id="saveNew">Save as new entry</button>
+</div>
+<div class="note" id="saveMsg"></div>
+</section>
+
+<section class="card">
+<div class="row" style="justify-content:space-between;margin-bottom:8px"><h2>History of programs</h2><div class="row"><div style="width:220px"><input id="hq" placeholder="Search job, reference or notes"></div><div style="width:150px"><select id="hs"><option value="">All statuses</option><option>Quoted</option><option>Won</option><option>In progress</option><option>Complete</option><option>Lost</option></select></div><button class="ghost" id="copyHist">Copy history as CSV</button></div></div>
+<div class="row" style="margin-bottom:10px"><div style="width:320px"><label>GitHub token (fine-grained, Contents read and write on vp-program-builder only)</label><input id="ghtoken" type="password" placeholder="github_pat_..." autocomplete="off"></div><button class="ghost small" id="saveTok">Save token in this browser</button><button class="ghost small" id="clearTok">Remove token</button><button class="ghost small" id="refreshHist">Refresh history</button></div>
+<div class="tiles" id="hTiles"></div>
+<div id="histTable"></div>
+<div class="note" id="histNote"></div>
+</section>
+
+<section class="card">
+<div class="row" style="justify-content:space-between;margin-bottom:8px"><h2>Areas and quantities</h2>
+<div class="row"><button id="addArea">Add area</button><button class="ghost" id="addJob">Add job-level area</button><button class="ghost" id="reset">Reset to PVP-1126-D</button></div></div>
+<div class="muted" style="margin-bottom:10px">An area is a level, floor or zone. Each area gets a Victorian Projects task and a DJB Electrical task. Job-level lines (site setup, job balance set-up) and all commissioning lines are programmed once, at the start and end.</div>
+<div id="areas"></div>
+</section>
+
+<section class="card">
+<h2>Program</h2>
+<div class="tiles" id="tiles"></div>
+<div class="gantt" id="gantt"></div>
+<div class="note">Days = hours x difficulty / (people x hours per person per day), rounded up, minimum 1. DJB for an area starts the day after our crew finishes it and runs alongside our crew on the next area. Commissioning is last because ceilings close once sheeted.</div>
+<div id="warns"></div>
+</section>
+
+<section class="card">
+<h2>Hours build</h2>
+<div id="hours"></div>
+</section>
+
+<section class="card">
+<h2>Copy out</h2>
+<div class="row"><button id="copyCsv">Copy program and hours as CSV</button><span class="muted" id="copyMsg"></span></div>
+<textarea class="csv" id="csv" readonly style="margin-top:8px"></textarea>
+<div class="note">Paste into Excel or Simpro notes.</div>
+</section>
+</main>
+
+<script>
+const LIB = [{"id": "Duct Installation|2", "tab": "Duct Installation", "row": 2, "group": "Duct installation", "label": "Duct install, per m2 of straight duct", "h": {"Rough in": 0.55}, "who": "VP"}, {"id": "Duct Installation|3", "tab": "Duct Installation", "row": 3, "group": "Duct installation", "label": "Hang ducted unit (each)", "h": {"Rough in": 2.2}, "who": "VP"}, {"id": "Duct Installation|4", "tab": "Duct Installation", "row": 4, "group": "Duct installation", "label": "Risers and droppers, supplied and installed (each)", "h": {"Rough in": 2.0}, "who": "VP"}, {"id": "Duct Installation|5", "tab": "Duct Installation", "row": 5, "group": "Duct installation", "label": "Cushion head box install (each)", "h": {"Rough in": 0.5}, "who": "VP"}, {"id": "Duct Installation|6", "tab": "Duct Installation", "row": 6, "group": "Duct installation", "label": "Linear slot box install (each)", "h": {"Rough in": 1.5}, "who": "VP"}, {"id": "Duct Installation|7", "tab": "Duct Installation", "row": 7, "group": "Duct installation", "label": "Hood install only (each)", "h": {"Rough in": 6.0}, "who": "VP"}, {"id": "Duct Installation|8", "tab": "Duct Installation", "row": 8, "group": "Duct installation", "label": "Cut into existing duct and fit a transition (each)", "h": {"Rough in": 3.0}, "who": "VP"}, {"id": "Duct Installation|9", "tab": "Duct Installation", "row": 9, "group": "Duct installation", "label": "Balance new outlets on an existing system (per outlet)", "h": {"Commissioning": 0.5}, "who": "VP"}, {"id": "Duct Installation|10", "tab": "Duct Installation", "row": 10, "group": "Duct installation", "label": "Balance set-up on an existing system (per job)", "h": {"Commissioning": 1.0}, "who": "VP"}, {"id": "Duct Installation|11", "tab": "Duct Installation", "row": 11, "group": "Duct installation", "label": "Hood supplied and installed (each)", "h": {"Rough in": 30.0}, "who": "VP"}, {"id": "Duct Installation|12", "tab": "Duct Installation", "row": 12, "group": "Duct installation", "label": "Spiral duct install, per m2 (pi x diameter x length)", "h": {"Rough in": 0.55}, "who": "VP"}, {"id": "Duct Installation|13", "tab": "Duct Installation", "row": 13, "group": "Duct installation", "label": "NEW: Duct install up to 400mm wide, per m2 of straight duct (use instead of row 2)", "h": {"Rough in": 1.2}, "who": "VP"}, {"id": "Duct Installation|14", "tab": "Duct Installation", "row": 14, "group": "Duct installation", "label": "NEW: Spiral duct install up to 400mm diameter, per m2 (use instead of the spiral row)", "h": {"Rough in": 1.2}, "who": "VP"}, {"id": "Air Conditioning Installation|2", "tab": "Air Conditioning Installation", "row": 2, "group": "AC rough in", "label": "High Wall Installation less than 20m", "h": {"Rough in": 7.0}, "who": "VP"}, {"id": "Air Conditioning Installation|3", "tab": "Air Conditioning Installation", "row": 3, "group": "AC rough in", "label": "High Wall Installation more than 20m", "h": {"Rough in": 11.0}, "who": "VP"}, {"id": "Air Conditioning Installation|4", "tab": "Air Conditioning Installation", "row": 4, "group": "AC rough in", "label": "Ceiling Cassette/Bulkhead less than 20m", "h": {"Rough in": 16.0}, "who": "VP"}, {"id": "Air Conditioning Installation|5", "tab": "Air Conditioning Installation", "row": 5, "group": "AC rough in", "label": "Ceiling Cassette/Bulkhead more than 20m", "h": {"Rough in": 16.0}, "who": "VP"}, {"id": "Air Conditioning Installation|6", "tab": "Air Conditioning Installation", "row": 6, "group": "AC rough in", "label": "Slim or bulkhead ducted, 1 to 3 outlets, less than 20m", "h": {"Rough in": 22.0}, "who": "VP"}, {"id": "Air Conditioning Installation|7", "tab": "Air Conditioning Installation", "row": 7, "group": "AC rough in", "label": "Slim or bulkhead ducted, 1 to 3 outlets, more than 20m", "h": {"Rough in": 30.0}, "who": "VP"}, {"id": "Air Conditioning Installation|8", "tab": "Air Conditioning Installation", "row": 8, "group": "AC rough in", "label": "Ducted System up to 8 points", "h": {"Rough in": 33.0}, "who": "VP"}, {"id": "Air Conditioning Installation|9", "tab": "Air Conditioning Installation", "row": 9, "group": "AC rough in", "label": "Ducted System 9 to 12 points", "h": {"Rough in": 41.0}, "who": "VP"}, {"id": "Air Conditioning Installation|10", "tab": "Air Conditioning Installation", "row": 10, "group": "AC rough in", "label": "Ducted System more than 12 points", "h": {"Rough in": 49.0}, "who": "VP"}, {"id": "Air Conditioning Installation|11", "tab": "Air Conditioning Installation", "row": 11, "group": "AC rough in", "label": "VRV 2 pipe (per indoor unit)", "h": {"Rough in": 3.0}, "who": "VP"}, {"id": "Air Conditioning Installation|12", "tab": "Air Conditioning Installation", "row": 12, "group": "AC rough in", "label": "VRV 3 pipe (per indoor unit)", "h": {"Rough in": 4.0}, "who": "VP"}, {"id": "Air Conditioning Installation|13", "tab": "Air Conditioning Installation", "row": 13, "group": "AC rough in", "label": "Branch Box", "h": {"Rough in": 5.0}, "who": "VP"}, {"id": "Air Conditioning Installation|14", "tab": "Air Conditioning Installation", "row": 14, "group": "AC rough in", "label": "Linear Slot/Bar Grille per meter", "h": {"Rough in": 1.0}, "who": "VP"}, {"id": "Air Conditioning Installation|15", "tab": "Air Conditioning Installation", "row": 15, "group": "AC rough in", "label": "ERV", "h": {"Rough in": 21.0}, "who": "VP"}, {"id": "Air Conditioning Installation|16", "tab": "Air Conditioning Installation", "row": 16, "group": "AC rough in", "label": "Pool dehumidifier, ceiling or floor, up to 150 kg", "h": {"Rough in": 12.0}, "who": "VP"}, {"id": "Air Conditioning Installation|17", "tab": "Air Conditioning Installation", "row": 17, "group": "AC rough in", "label": "Existing indoor unit re-ducted in place, all in (unit stays running)", "h": {"Rough in": 4.0}, "who": "VP"}, {"id": "Air Conditioning Installation|18", "tab": "Air Conditioning Installation", "row": 18, "group": "AC rough in", "label": "Relocate existing indoor unit, same floor, same system, all in", "h": {"Rough in": 24.0}, "who": "VP"}, {"id": "Air Conditioning Installation|19", "tab": "Air Conditioning Installation", "row": 19, "group": "AC rough in", "label": "Completion of a part-built installation, per AC system", "h": {"Rough in": 16.0}, "who": "VP"}, {"id": "Air Conditioning Installation|25", "tab": "Air Conditioning Installation", "row": 25, "group": "AC fit off", "label": "High Wall Installation less than 20m", "h": {"Fit off": 4.0}, "who": "VP"}, {"id": "Air Conditioning Installation|26", "tab": "Air Conditioning Installation", "row": 26, "group": "AC fit off", "label": "High Wall Installation more than 20m", "h": {"Fit off": 5.0}, "who": "VP"}, {"id": "Air Conditioning Installation|27", "tab": "Air Conditioning Installation", "row": 27, "group": "AC fit off", "label": "Ceiling Cassette/Bulkhead less than 20m", "h": {"Fit off": 2.0}, "who": "VP"}, {"id": "Air Conditioning Installation|28", "tab": "Air Conditioning Installation", "row": 28, "group": "AC fit off", "label": "Ceiling Cassette/Bulkhead more than 20m", "h": {"Fit off": 10.0}, "who": "VP"}, {"id": "Air Conditioning Installation|29", "tab": "Air Conditioning Installation", "row": 29, "group": "AC fit off", "label": "Slim or bulkhead ducted, 1 to 3 outlets, less than 20m", "h": {"Fit off": 4.0}, "who": "VP"}, {"id": "Air Conditioning Installation|30", "tab": "Air Conditioning Installation", "row": 30, "group": "AC fit off", "label": "Slim or bulkhead ducted, 1 to 3 outlets, more than 20m", "h": {"Fit off": 4.0}, "who": "VP"}, {"id": "Air Conditioning Installation|31", "tab": "Air Conditioning Installation", "row": 31, "group": "AC fit off", "label": "Ducted System up to 8 points", "h": {"Fit off": 17.0}, "who": "VP"}, {"id": "Air Conditioning Installation|32", "tab": "Air Conditioning Installation", "row": 32, "group": "AC fit off", "label": "Ducted System 9 to 12 points", "h": {"Fit off": 25.0}, "who": "VP"}, {"id": "Air Conditioning Installation|33", "tab": "Air Conditioning Installation", "row": 33, "group": "AC fit off", "label": "Ducted System more than 12 points", "h": {"Fit off": 31.0}, "who": "VP"}, {"id": "Air Conditioning Installation|34", "tab": "Air Conditioning Installation", "row": 34, "group": "AC fit off", "label": "VRV 2 pipe (per indoor unit)", "h": {"Fit off": 2.0}, "who": "VP"}, {"id": "Air Conditioning Installation|35", "tab": "Air Conditioning Installation", "row": 35, "group": "AC fit off", "label": "VRV 3 pipe (per indoor unit)", "h": {"Fit off": 2.0}, "who": "VP"}, {"id": "Air Conditioning Installation|36", "tab": "Air Conditioning Installation", "row": 36, "group": "AC fit off", "label": "Linear Slot/Bar Grille per meter", "h": {"Fit off": 1.5}, "who": "VP"}, {"id": "Air Conditioning Installation|37", "tab": "Air Conditioning Installation", "row": 37, "group": "AC fit off", "label": "Weather louvre", "h": {"Fit off": 1.5}, "who": "VP"}, {"id": "Air Conditioning Installation|38", "tab": "Air Conditioning Installation", "row": 38, "group": "AC fit off", "label": "ERV", "h": {"Fit off": 3.0}, "who": "VP"}, {"id": "Air Conditioning Installation|44", "tab": "Air Conditioning Installation", "row": 44, "group": "AC commissioning", "label": "High Wall Installation less than 20m", "h": {"Commissioning": 2.0}, "who": "VP"}, {"id": "Air Conditioning Installation|45", "tab": "Air Conditioning Installation", "row": 45, "group": "AC commissioning", "label": "High Wall Installation more than 20m", "h": {"Commissioning": 2.0}, "who": "VP"}, {"id": "Air Conditioning Installation|46", "tab": "Air Conditioning Installation", "row": 46, "group": "AC commissioning", "label": "Ceiling Cassette/Bulkhead less than 20m", "h": {"Commissioning": 1.0}, "who": "VP"}, {"id": "Air Conditioning Installation|47", "tab": "Air Conditioning Installation", "row": 47, "group": "AC commissioning", "label": "Ceiling Cassette/Bulkhead more than 20m", "h": {"Commissioning": 1.0}, "who": "VP"}, {"id": "Air Conditioning Installation|48", "tab": "Air Conditioning Installation", "row": 48, "group": "AC commissioning", "label": "Slim or bulkhead ducted, 1 to 3 outlets, less than 20m", "h": {"Commissioning": 2.5}, "who": "VP"}, {"id": "Air Conditioning Installation|49", "tab": "Air Conditioning Installation", "row": 49, "group": "AC commissioning", "label": "Slim or bulkhead ducted, 1 to 3 outlets, more than 20m", "h": {"Commissioning": 2.5}, "who": "VP"}, {"id": "Air Conditioning Installation|50", "tab": "Air Conditioning Installation", "row": 50, "group": "AC commissioning", "label": "Ducted System up to 8 points", "h": {"Commissioning": 4.0}, "who": "VP"}, {"id": "Air Conditioning Installation|51", "tab": "Air Conditioning Installation", "row": 51, "group": "AC commissioning", "label": "Ducted System 9 to 12 points", "h": {"Commissioning": 5.0}, "who": "VP"}, {"id": "Air Conditioning Installation|52", "tab": "Air Conditioning Installation", "row": 52, "group": "AC commissioning", "label": "Ducted System more than 12 points", "h": {"Commissioning": 6.0}, "who": "VP"}, {"id": "Air Conditioning Installation|53", "tab": "Air Conditioning Installation", "row": 53, "group": "AC commissioning", "label": "VRV 2 pipe (per indoor unit)", "h": {"Commissioning": 3.0}, "who": "VP"}, {"id": "Air Conditioning Installation|54", "tab": "Air Conditioning Installation", "row": 54, "group": "AC commissioning", "label": "VRV 3 pipe (per indoor unit)", "h": {"Commissioning": 3.0}, "who": "VP"}, {"id": "Air Conditioning Installation|55", "tab": "Air Conditioning Installation", "row": 55, "group": "AC commissioning", "label": "ERV", "h": {"Commissioning": 5.0}, "who": "VP"}, {"id": "Air Conditioning Installation|56", "tab": "Air Conditioning Installation", "row": 56, "group": "AC commissioning", "label": "Pool dehumidifier, ceiling or floor, up to 150 kg", "h": {"Commissioning": 4.0}, "who": "VP"}, {"id": "Air Conditioning Installation|60", "tab": "Air Conditioning Installation", "row": 60, "group": "Other installation items", "label": "Grille or diffuser fit-off, ventilation items only", "h": {"Fit off": 0.5}, "who": "VP"}, {"id": "Air Conditioning Installation|61", "tab": "Air Conditioning Installation", "row": 61, "group": "Other installation items", "label": "Flex connection, ventilation items only (placeholder, Jen to set)", "h": {"Fit off": 0.35}, "who": "VP"}, {"id": "Air Conditioning Installation|62", "tab": "Air Conditioning Installation", "row": 62, "group": "Other installation items", "label": "Weather louvre fit-off", "h": {"Fit off": 1.5}, "who": "VP"}, {"id": "Air Conditioning Installation|63", "tab": "Air Conditioning Installation", "row": 63, "group": "Other installation items", "label": "Central controller install", "h": {"Fit off": 8.0}, "who": "VP"}, {"id": "Air Conditioning Installation|64", "tab": "Air Conditioning Installation", "row": 64, "group": "Other installation items", "label": "Seismic install, per indoor unit that needs it", "h": {"Fit off": 0.75}, "who": "VP"}, {"id": "Air Conditioning Installation|65", "tab": "Air Conditioning Installation", "row": 65, "group": "Other installation items", "label": "Seismic install, solid duct, per METRE where required", "h": {"Fit off": 0.25}, "who": "VP"}, {"id": "Air Conditioning Installation|66", "tab": "Air Conditioning Installation", "row": 66, "group": "Other installation items", "label": "Low voltage item wired by VP with no MSSB (PIR, damper actuator, interlock, sensor, fan speed controller, run-on timer), each", "h": {"Fit off": 0.5}, "who": "VP"}, {"id": "Air Conditioning Installation|67", "tab": "Air Conditioning Installation", "row": 67, "group": "Other installation items", "label": "Site setup and establishment, per job (qty 1 on every job)", "h": {"Site setup": 8.0}, "who": "VP"}, {"id": "Air Conditioning Installation|73", "tab": "Air Conditioning Installation", "row": 73, "group": "Rates decided by Mat", "label": "Energy or water meter cut-in to existing pipework, per meter (isolate, cut in, flange or pocket, reinstate)", "h": {"Rough in": 4.0}, "who": "VP"}, {"id": "Air Conditioning Installation|74", "tab": "Air Conditioning Installation", "row": 74, "group": "Rates decided by Mat", "label": "Return visit to fit linear slot cores into plaster-in frames after painting, per slot", "h": {"Rough in": 0.5}, "who": "VP"}, {"id": "Air Conditioning Installation|75", "tab": "Air Conditioning Installation", "row": 75, "group": "Rates decided by Mat", "label": "Extra over: cushion head box hung on allthread in an exposed (sprayed or open) ceiling, each", "h": {"Rough in": 1.0}, "who": "VP"}, {"id": "Air Conditioning Installation|76", "tab": "Air Conditioning Installation", "row": 76, "group": "Rates decided by Mat", "label": "Extra over: flexible duct run hung with Panduit straps in an exposed ceiling, each run", "h": {"Rough in": 0.25}, "who": "VP"}, {"id": "Fans|2", "tab": "Fans", "row": 2, "group": "Fans and source capture", "label": "Inline Fan (round)", "h": {"Fit off": 3.5}, "who": "VP"}, {"id": "Fans|3", "tab": "Fans", "row": 3, "group": "Fans and source capture", "label": "Inline Fan (square)", "h": {"Fit off": 4.5}, "who": "VP"}, {"id": "Fans|4", "tab": "Fans", "row": 4, "group": "Fans and source capture", "label": "Roof Mounted fan", "h": {"Fit off": 3.5}, "who": "VP"}, {"id": "Fans|5", "tab": "Fans", "row": 5, "group": "Fans and source capture", "label": "roof mounted cowl", "h": {"Fit off": 1.5}, "who": "VP"}, {"id": "Fans|6", "tab": "Fans", "row": 6, "group": "Fans and source capture", "label": "ceiling mounted", "h": {"Fit off": 2.0}, "who": "VP"}, {"id": "Fans|7", "tab": "Fans", "row": 7, "group": "Fans and source capture", "label": "wall mounted", "h": {"Fit off": 2.0}, "who": "VP"}, {"id": "Fans|8", "tab": "Fans", "row": 8, "group": "Fans and source capture", "label": "HVLS", "h": {"Fit off": 8.0}, "who": "VP"}, {"id": "Fans|9", "tab": "Fans", "row": 9, "group": "Fans and source capture", "label": "Roof Ventilators", "h": {"Fit off": 5.0}, "who": "VP"}, {"id": "Fans|10", "tab": "Fans", "row": 10, "group": "Fans and source capture", "label": "wall mounted, fixed above 3 m", "h": {"Fit off": 4.0}, "who": "VP"}, {"id": "Fans|11", "tab": "Fans", "row": 11, "group": "Fans and source capture", "label": "Source capture: SBT track (per bay)", "h": {"Fit off": 6.0}, "who": "VP"}, {"id": "Fans|12", "tab": "Fans", "row": 12, "group": "Fans and source capture", "label": "Source capture: hose kit and balancer (each)", "h": {"Fit off": 3.0}, "who": "VP"}, {"id": "Fans|13", "tab": "Fans", "row": 13, "group": "Fans and source capture", "label": "Source capture: metal roof penetration (each)", "h": {"Fit off": 6.0}, "who": "VP"}, {"id": "Fans|14", "tab": "Fans", "row": 14, "group": "Fans and source capture", "label": "Source capture: commissioning (per job)", "h": {"Commissioning": 4.0}, "who": "VP"}, {"id": "Fans|15", "tab": "Fans", "row": 15, "group": "Fans and source capture", "label": "Source capture: commissioning (per bay)", "h": {"Commissioning": 1.0}, "who": "VP"}, {"id": "Fans|16", "tab": "Fans", "row": 16, "group": "Fans and source capture", "label": "Silencers", "h": {"Fit off": 2.0}, "who": "VP"}, {"id": "Fans|22", "tab": "Fans", "row": 22, "group": "Fans and source capture", "label": "Source capture: JetVent install, hang an extra or replacement JetVent (each)", "h": {"Fit off": 4.5}, "who": "VP"}, {"id": "Fans|23", "tab": "Fans", "row": 23, "group": "Fans and source capture", "label": "JetVent rehang: reinstate an EXISTING JetVent on its existing all-thread (each)", "h": {"Fit off": 2.5}, "who": "VP"}, {"id": "Fans|24", "tab": "Fans", "row": 24, "group": "Fans and source capture", "label": "Ceiling tiles: lift and replace the tiles around a ceiling-hung JetVent (each fan, each visit)", "h": {"Fit off": 0.5}, "who": "VP"}, {"id": "Demolition|2", "tab": "Demolition", "row": 2, "group": "Demolition: air conditioning", "label": "High Wall Installation less than 20m", "h": {"Demolition": 2.0}, "who": "VP"}, {"id": "Demolition|3", "tab": "Demolition", "row": 3, "group": "Demolition: air conditioning", "label": "High Wall Installation more than 20m", "h": {"Demolition": 2.0}, "who": "VP"}, {"id": "Demolition|4", "tab": "Demolition", "row": 4, "group": "Demolition: air conditioning", "label": "Ceiling Cassette/Bulkhead less than 20m", "h": {"Demolition": 3.0}, "who": "VP"}, {"id": "Demolition|5", "tab": "Demolition", "row": 5, "group": "Demolition: air conditioning", "label": "Ceiling Cassette/Bulkhead more than 20m", "h": {"Demolition": 3.0}, "who": "VP"}, {"id": "Demolition|6", "tab": "Demolition", "row": 6, "group": "Demolition: air conditioning", "label": "Ducted System less than 8 points", "h": {"Demolition": 9.0}, "who": "VP"}, {"id": "Demolition|7", "tab": "Demolition", "row": 7, "group": "Demolition: air conditioning", "label": "Ducted System less than 12 points", "h": {"Demolition": 13.0}, "who": "VP"}, {"id": "Demolition|8", "tab": "Demolition", "row": 8, "group": "Demolition: air conditioning", "label": "Ducted System more than 10 points", "h": {"Demolition": 17.0}, "who": "VP"}, {"id": "Demolition|9", "tab": "Demolition", "row": 9, "group": "Demolition: air conditioning", "label": "VRV 2 pipe (per indoor unit)", "h": {"Demolition": 3.0}, "who": "VP"}, {"id": "Demolition|10", "tab": "Demolition", "row": 10, "group": "Demolition: air conditioning", "label": "VRV 3 pipe (per indoor unit)", "h": {"Demolition": 4.0}, "who": "VP"}, {"id": "Demolition|11", "tab": "Demolition", "row": 11, "group": "Demolition: air conditioning", "label": "Linear Slot/Bar Grille per meter", "h": {"Demolition": 1.5}, "who": "VP"}, {"id": "Demolition|12", "tab": "Demolition", "row": 12, "group": "Demolition: air conditioning", "label": "Weather louvre", "h": {"Demolition": 1.5}, "who": "VP"}, {"id": "Demolition|13", "tab": "Demolition", "row": 13, "group": "Demolition: air conditioning", "label": "ERV", "h": {"Demolition": 5.0}, "who": "VP"}, {"id": "Demolition|14", "tab": "Demolition", "row": 14, "group": "Demolition: air conditioning", "label": "Outdoor Unit", "h": {"Demolition": 2.0}, "who": "VP"}, {"id": "Demolition|18", "tab": "Demolition", "row": 18, "group": "Demolition: electrical", "label": "central controller", "h": {"Demolition": 2.0}, "who": "VP"}, {"id": "Demolition|19", "tab": "Demolition", "row": 19, "group": "Demolition: electrical", "label": "remote sensor", "h": {"Demolition": 1.5}, "who": "VP"}, {"id": "Demolition|20", "tab": "Demolition", "row": 20, "group": "Demolition: electrical", "label": "zone motor", "h": {"Demolition": 1.5}, "who": "VP"}, {"id": "Demolition|21", "tab": "Demolition", "row": 21, "group": "Demolition: electrical", "label": "zone motor kit", "h": {"Demolition": 1.5}, "who": "VP"}, {"id": "Demolition|22", "tab": "Demolition", "row": 22, "group": "Demolition: electrical", "label": "fans", "h": {"Demolition": 2.0}, "who": "VP"}, {"id": "Demolition|23", "tab": "Demolition", "row": 23, "group": "Demolition: electrical", "label": "branch box", "h": {"Demolition": 3.0}, "who": "VP"}, {"id": "Demolition|24", "tab": "Demolition", "row": 24, "group": "Demolition: electrical", "label": "infrared wall controller", "h": {"Demolition": 1.5}, "who": "VP"}, {"id": "Demolition|25", "tab": "Demolition", "row": 25, "group": "Demolition: electrical", "label": "wired controller", "h": {"Demolition": 1.5}, "who": "VP"}, {"id": "Demolition|26", "tab": "Demolition", "row": 26, "group": "Demolition: electrical", "label": "fan thermostat", "h": {"Demolition": 1.5}, "who": "VP"}, {"id": "Demolition|27", "tab": "Demolition", "row": 27, "group": "Demolition: electrical", "label": "switchboard", "h": {"Demolition": 5.0}, "who": "VP"}, {"id": "Demolition|28", "tab": "Demolition", "row": 28, "group": "Demolition: electrical", "label": "Co2 sensor", "h": {"Demolition": 1.5}, "who": "VP"}, {"id": "Demolition|29", "tab": "Demolition", "row": 29, "group": "Demolition: electrical", "label": "motorised dampers", "h": {"Demolition": 1.5}, "who": "VP"}, {"id": "Demolition|30", "tab": "Demolition", "row": 30, "group": "Demolition: electrical", "label": "fan speed controller", "h": {"Demolition": 1.5}, "who": "VP"}, {"id": "Demolition|31", "tab": "Demolition", "row": 31, "group": "Demolition: electrical", "label": "VSD", "h": {"Demolition": 1.0}, "who": "VP"}, {"id": "Demolition|35", "tab": "Demolition", "row": 35, "group": "Demolition: fans", "label": "Inline Fan (round)", "h": {"Demolition": 1.5}, "who": "VP"}, {"id": "Demolition|36", "tab": "Demolition", "row": 36, "group": "Demolition: fans", "label": "Inline Fan (square)", "h": {"Demolition": 2.0}, "who": "VP"}, {"id": "Demolition|37", "tab": "Demolition", "row": 37, "group": "Demolition: fans", "label": "Roof Mounted fan", "h": {"Demolition": 2.0}, "who": "VP"}, {"id": "Demolition|38", "tab": "Demolition", "row": 38, "group": "Demolition: fans", "label": "roof mounted cowl", "h": {"Demolition": 1.5}, "who": "VP"}, {"id": "Demolition|39", "tab": "Demolition", "row": 39, "group": "Demolition: fans", "label": "ceiling mounted", "h": {"Demolition": 2.0}, "who": "VP"}, {"id": "Demolition|40", "tab": "Demolition", "row": 40, "group": "Demolition: fans", "label": "wall mounted", "h": {"Demolition": 1.5}, "who": "VP"}, {"id": "Demolition|41", "tab": "Demolition", "row": 41, "group": "Demolition: fans", "label": "HVLS", "h": {"Demolition": 5.0}, "who": "VP"}, {"id": "Demolition|42", "tab": "Demolition", "row": 42, "group": "Demolition: fans", "label": "Roof Ventilators", "h": {"Demolition": 3.0}, "who": "VP"}, {"id": "Demolition|43", "tab": "Demolition", "row": 43, "group": "Demolition: fans", "label": "Silencers", "h": {"Demolition": 2.0}, "who": "VP"}, {"id": "Demolition|49", "tab": "Demolition", "row": 49, "group": "Demolition: strip-out", "label": "Grille or diffuser and cushion head box, with its flex (each outlet)", "h": {"Demolition": 0.25}, "who": "VP"}, {"id": "Demolition|50", "tab": "Demolition", "row": 50, "group": "Demolition: strip-out", "label": "Carry waste out to the builder's bin (each outlet)", "h": {"Demolition": 0.0833}, "who": "VP"}, {"id": "Demolition|51", "tab": "Demolition", "row": 51, "group": "Demolition: strip-out", "label": "Rigid duct removal, 500x500 and under (per metre of run)", "h": {"Demolition": 0.3333}, "who": "VP"}, {"id": "Demolition|52", "tab": "Demolition", "row": 52, "group": "Demolition: strip-out", "label": "Rigid duct removal, over 500x500 (per metre of run)", "h": {"Demolition": 0.5}, "who": "VP"}, {"id": "Demolition|53", "tab": "Demolition", "row": 53, "group": "Demolition: strip-out", "label": "Kitchen exhaust duct removal (per metre of run)", "h": {"Demolition": 1.0}, "who": "VP"}, {"id": "Demolition|54", "tab": "Demolition", "row": 54, "group": "Demolition: strip-out", "label": "Cap off a cut duct (each cap)", "h": {"Demolition": 0.0833}, "who": "VP"}, {"id": "Demolition|63", "tab": "Demolition", "row": 63, "group": "Demolition: JetVent", "label": "JetVent removal: lower an EXISTING JetVent off its all-thread, keep the rod, store it protected on site (each)", "h": {"Demolition": 2.0}, "who": "VP"}, {"id": "Electrical Installation|5", "tab": "Electrical Installation", "row": 5, "group": "Electrical: mains", "label": "MSSB: hang the board and fit off every circuit inside it (each board)", "h": {"Fit off": 12.0}, "who": "DJB"}, {"id": "Electrical Installation|6", "tab": "Electrical Installation", "row": 6, "group": "Electrical: mains", "label": "Mains submain, board to board", "h": {"Rough in": 4.0}, "who": "DJB"}, {"id": "Electrical Installation|7", "tab": "Electrical Installation", "row": 7, "group": "Electrical: mains", "label": "Mains circuit to a high wall split indoor unit", "h": {"Rough in": 2.0, "Fit off": 1.5}, "who": "DJB"}, {"id": "Electrical Installation|8", "tab": "Electrical Installation", "row": 8, "group": "Electrical: mains", "label": "Mains circuit to a ceiling cassette or bulkhead indoor unit", "h": {"Rough in": 2.0, "Fit off": 1.5}, "who": "DJB"}, {"id": "Electrical Installation|9", "tab": "Electrical Installation", "row": 9, "group": "Electrical: mains", "label": "Mains circuit to a ducted indoor unit", "h": {"Rough in": 2.0, "Fit off": 1.5}, "who": "DJB"}, {"id": "Electrical Installation|10", "tab": "Electrical Installation", "row": 10, "group": "Electrical: mains", "label": "Mains circuit to an outdoor unit", "h": {"Rough in": 3.0, "Fit off": 2.0}, "who": "DJB"}, {"id": "Electrical Installation|11", "tab": "Electrical Installation", "row": 11, "group": "Electrical: mains", "label": "Mains circuit to a branch box", "h": {"Rough in": 3.0, "Fit off": 2.0}, "who": "DJB"}, {"id": "Electrical Installation|12", "tab": "Electrical Installation", "row": 12, "group": "Electrical: mains", "label": "Mains circuit to a fan", "h": {"Rough in": 3.0, "Fit off": 2.0}, "who": "DJB"}, {"id": "Electrical Installation|13", "tab": "Electrical Installation", "row": 13, "group": "Electrical: mains", "label": "Mains circuit to a hot water or in-duct heater", "h": {"Rough in": 3.0, "Fit off": 2.0}, "who": "DJB"}, {"id": "Electrical Installation|14", "tab": "Electrical Installation", "row": 14, "group": "Electrical: mains", "label": "CHANGEOVER, existing isolator stays in place (per outdoor unit)", "h": {"Fit off": 2}, "who": "DJB"}, {"id": "Electrical Installation|19", "tab": "Electrical Installation", "row": 19, "group": "Electrical: controls and interconnect", "label": "Interconnect, indoor to outdoor (per indoor unit)", "h": {"Rough in": 1.0, "Fit off": 0.5}, "who": "DJB"}, {"id": "Electrical Installation|20", "tab": "Electrical Installation", "row": 20, "group": "Electrical: controls and interconnect", "label": "Interconnect, indoor unit to branch box (per indoor unit)", "h": {"Rough in": 0.5, "Fit off": 0.25}, "who": "DJB"}, {"id": "Electrical Installation|21", "tab": "Electrical Installation", "row": 21, "group": "Electrical: controls and interconnect", "label": "Wired wall controller and its cable (per controller)", "h": {"Rough in": 0.25, "Fit off": 0.25}, "who": "DJB"}, {"id": "Electrical Installation|22", "tab": "Electrical Installation", "row": 22, "group": "Electrical: controls and interconnect", "label": "Infrared wall controller, backing plate only (each)", "h": {"Fit off": 0.0833}, "who": "DJB"}, {"id": "Electrical Installation|23", "tab": "Electrical Installation", "row": 23, "group": "Electrical: controls and interconnect", "label": "Remote sensor and its cable (per sensor)", "h": {"Rough in": 0.25, "Fit off": 0.25}, "who": "DJB"}, {"id": "Electrical Installation|24", "tab": "Electrical Installation", "row": 24, "group": "Electrical: controls and interconnect", "label": "Fan status or interlock cable back to the board (each fan)", "h": {"Rough in": 0.5, "Fit off": 1.0}, "who": "DJB"}, {"id": "Electrical Installation|25", "tab": "Electrical Installation", "row": 25, "group": "Electrical: controls and interconnect", "label": "Condensate pump, powered off the indoor unit (each)", "h": {"Rough in": 1.0, "Fit off": 1.0}, "who": "DJB"}, {"id": "Electrical Installation|26", "tab": "Electrical Installation", "row": 26, "group": "Electrical: controls and interconnect", "label": "Central controller", "h": {"Rough in": 1.5, "Fit off": 2.0}, "who": "DJB"}, {"id": "Electrical Installation|27", "tab": "Electrical Installation", "row": 27, "group": "Electrical: controls and interconnect", "label": "Fan thermostat", "h": {"Rough in": 1.0, "Fit off": 1.0}, "who": "DJB"}, {"id": "Electrical Installation|28", "tab": "Electrical Installation", "row": 28, "group": "Electrical: controls and interconnect", "label": "CO2 sensor", "h": {"Rough in": 1.0, "Fit off": 1.0}, "who": "DJB"}, {"id": "Electrical Installation|29", "tab": "Electrical Installation", "row": 29, "group": "Electrical: controls and interconnect", "label": "Duct static pressure sensor", "h": {"Rough in": 1.0, "Fit off": 1.0}, "who": "DJB"}, {"id": "Electrical Installation|30", "tab": "Electrical Installation", "row": 30, "group": "Electrical: controls and interconnect", "label": "Motorised damper", "h": {"Rough in": 1.0, "Fit off": 1.0}, "who": "DJB"}, {"id": "Electrical Installation|31", "tab": "Electrical Installation", "row": 31, "group": "Electrical: controls and interconnect", "label": "Fan speed controller", "h": {"Rough in": 1.0, "Fit off": 1.0}, "who": "DJB"}, {"id": "Electrical Installation|32", "tab": "Electrical Installation", "row": 32, "group": "Electrical: controls and interconnect", "label": "VSD", "h": {"Rough in": 2.0, "Fit off": 2.5}, "who": "DJB"}, {"id": "Electrical Installation|33", "tab": "Electrical Installation", "row": 33, "group": "Electrical: controls and interconnect", "label": "Zone motor", "h": {"Rough in": 1.5, "Fit off": 1.5}, "who": "DJB"}, {"id": "Electrical Installation|34", "tab": "Electrical Installation", "row": 34, "group": "Electrical: controls and interconnect", "label": "Zone motor kit", "h": {"Rough in": 3.0, "Fit off": 3.0}, "who": "DJB"}, {"id": "Electrical Installation|35", "tab": "Electrical Installation", "row": 35, "group": "Electrical: controls and interconnect", "label": "Time clock or timer mounted in the board (each)", "h": {"Rough in": 1.0, "Fit off": 1.0}, "who": "DJB"}, {"id": "Electrical Installation|36", "tab": "Electrical Installation", "row": 36, "group": "Electrical: controls and interconnect", "label": "Local control at the fan, switch or light switch (each)", "h": {"Rough in": 1.0, "Fit off": 1.0}, "who": "DJB"}, {"id": "Electrical Installation|37", "tab": "Electrical Installation", "row": 37, "group": "Electrical: controls and interconnect", "label": "Smoke or fire trip interlock from the FIP - ROUGH IN ALWAYS EXCLUDED", "h": {"Fit off": 0.5}, "who": "DJB"}, {"id": "Electrical Installation|38", "tab": "Electrical Installation", "row": 38, "group": "Electrical: controls and interconnect", "label": "BMS interface point or gateway (each) - ROUGH IN ALWAYS EXCLUDED", "h": {"Fit off": 1.0}, "who": "DJB"}, {"id": "Electrical Installation|43", "tab": "Electrical Installation", "row": 43, "group": "Electrical: cut-outs", "label": "Cut-out, wired wall controller (each)", "h": {"Rough in": 0.1667}, "who": "DJB"}, {"id": "Electrical Installation|44", "tab": "Electrical Installation", "row": 44, "group": "Electrical: cut-outs", "label": "Cut-out, infrared wall controller backing plate (each)", "h": {"Rough in": 0.1667}, "who": "DJB"}, {"id": "Electrical Installation|45", "tab": "Electrical Installation", "row": 45, "group": "Electrical: cut-outs", "label": "Cut-out, remote sensor (each)", "h": {"Rough in": 0.1667}, "who": "DJB"}, {"id": "Electrical Installation|46", "tab": "Electrical Installation", "row": 46, "group": "Electrical: cut-outs", "label": "Cut-out, fan thermostat (each)", "h": {"Rough in": 0.1667}, "who": "DJB"}, {"id": "Electrical Installation|47", "tab": "Electrical Installation", "row": 47, "group": "Electrical: cut-outs", "label": "Cut-out, CO2 sensor (each)", "h": {"Rough in": 0.1667}, "who": "DJB"}, {"id": "Electrical Installation|48", "tab": "Electrical Installation", "row": 48, "group": "Electrical: cut-outs", "label": "Cut-out, fan speed controller (each)", "h": {"Rough in": 0.1667}, "who": "DJB"}, {"id": "Electrical Installation|49", "tab": "Electrical Installation", "row": 49, "group": "Electrical: cut-outs", "label": "Cut-out, local control switch at the fan (each)", "h": {"Rough in": 0.1667}, "who": "DJB"}, {"id": "Electrical Installation|50", "tab": "Electrical Installation", "row": 50, "group": "Electrical: cut-outs", "label": "Cut-out, isolator or blanking plate (each)", "h": {"Rough in": 0.1667}, "who": "DJB"}, {"id": "Electrical Installation|56", "tab": "Electrical Installation", "row": 56, "group": "Electrical: fans", "label": "Fan case 2: site electrician provides the circuit, plug it in (each fan)", "h": {"Fit off": 0.1667}, "who": "DJB"}, {"id": "Electrical Installation|57", "tab": "Electrical Installation", "row": 57, "group": "Electrical: fans", "label": "Fan case 3: fan on a timer in our board, programming (each fan)", "h": {"Fit off": 0.1667}, "who": "DJB"}, {"id": "Electrical Installation|58", "tab": "Electrical Installation", "row": 58, "group": "Electrical: fans", "label": "Fan case 4a: fan on a light switch, fit off (each fan)", "h": {"Fit off": 0.5}, "who": "DJB"}, {"id": "Electrical Installation|59", "tab": "Electrical Installation", "row": 59, "group": "Electrical: fans", "label": "Fan case 4b: fan on a thermostat, fit off (each fan)", "h": {"Fit off": 0.1667}, "who": "DJB"}, {"id": "Electrical Installation|60", "tab": "Electrical Installation", "row": 60, "group": "Electrical: fans", "label": "EC fan with a 0-10V speed signal (each fan)", "h": {"Fit off": 0.1667}, "who": "DJB"}, {"id": "Electrical Installation|65", "tab": "Electrical Installation", "row": 65, "group": "Electrical: materials and sundries", "label": "MCB (each)", "h": {"Fit off": 0.1667}, "who": "DJB"}, {"id": "Electrical Installation|66", "tab": "Electrical Installation", "row": 66, "group": "Electrical: materials and sundries", "label": "Cable, any size including screened (per metre) - BACKUP ROW ONLY", "h": {"Rough in": 0.0333}, "who": "DJB"}, {"id": "Electrical Installation|67", "tab": "Electrical Installation", "row": 67, "group": "Electrical: materials and sundries", "label": "Gland (each)", "h": {"Rough in": 0.0167}, "who": "DJB"}, {"id": "Electrical Installation|68", "tab": "Electrical Installation", "row": 68, "group": "Electrical: materials and sundries", "label": "Isolator (each)", "h": {"Rough in": 0.5}, "who": "DJB"}, {"id": "Electrical Installation|69", "tab": "Electrical Installation", "row": 69, "group": "Electrical: materials and sundries", "label": "Cable tray and brackets (per 3 m length)", "h": {"Rough in": 0.5}, "who": "DJB"}, {"id": "Electrical Installation|70", "tab": "Electrical Installation", "row": 70, "group": "Electrical: materials and sundries", "label": "Conduit, saddles and fittings (per metre)", "h": {"Fit off": 0.0333}, "who": "DJB"}, {"id": "Electrical Installation|71", "tab": "Electrical Installation", "row": 71, "group": "Electrical: materials and sundries", "label": "Catenary wire (per metre)", "h": {"Rough in": 0.0167}, "who": "DJB"}, {"id": "Electrical Installation|72", "tab": "Electrical Installation", "row": 72, "group": "Electrical: materials and sundries", "label": "Penetration and fire seal (each)", "h": {"Rough in": 0.3333}, "who": "DJB"}, {"id": "Electrical Installation|73", "tab": "Electrical Installation", "row": 73, "group": "Electrical: materials and sundries", "label": "Board labelling and as-built schedule (per board)", "h": {"Fit off": 1.0}, "who": "DJB"}, {"id": "Electrical Installation|74", "tab": "Electrical Installation", "row": 74, "group": "Electrical: materials and sundries", "label": "Test, tag and electrical COC (per board)", "h": {"Fit off": 1.0}, "who": "DJB"}, {"id": "Electrical Installation|92", "tab": "Electrical Installation", "row": 92, "group": "Electrical: reconnect existing fan", "label": "Reconnect an EXISTING fan to its existing supply at the junction box (each fan)", "h": {"Fit off": 0.5}, "who": "DJB"}];
+const BYID = Object.fromEntries(LIB.map(e=>[e.id,e]));
+const STAGES = ['Rough in','Fit off','Commissioning','Demolition','Site setup'];
+const DEFAULT = {"name": "459 Little Collins St, P2 and P3 offices variation", "ref": "PVP-1126-D", "start": "2026-11-30", "own": 2, "djb": 1, "hpd": 7.6, "diff": 1, "closures": "2026-12-23\n2026-12-24\n2026-12-25\n2026-12-28\n2026-12-29\n2026-12-30\n2026-12-31\n2027-01-01\n2027-01-04\n2027-01-05\n2027-01-26", "status": "Quoted", "notes": "Hot and cold takeoffs with room control, Kahlon Building Co. Placeholder start date.", "areas": [{"id": "job", "name": "Job level", "units": 1, "job": true, "lines": [{"lib": "Air Conditioning Installation|67", "mode": "fixed", "qty": 1}, {"lib": "Duct Installation|10", "mode": "fixed", "qty": 1}]}, {"id": "l0", "name": "Level 3", "units": 3, "job": false, "lines": [{"lib": "Duct Installation|8", "mode": "unit", "qty": 2}, {"lib": "Electrical Installation|30", "mode": "unit", "qty": 2}, {"lib": "Electrical Installation|21", "mode": "unit", "qty": 1}, {"lib": "Electrical Installation|11", "mode": "fixed", "qty": 1}, {"lib": "Electrical Installation|68", "mode": "fixed", "qty": 1}, {"lib": "Electrical Installation|65", "mode": "fixed", "qty": 1}, {"lib": "Electrical Installation|74", "mode": "fixed", "qty": 1}, {"lib": "Duct Installation|9", "mode": "unit", "qty": 1}]}, {"id": "l1", "name": "Level 4", "units": 3, "job": false, "lines": [{"lib": "Duct Installation|8", "mode": "unit", "qty": 2}, {"lib": "Electrical Installation|30", "mode": "unit", "qty": 2}, {"lib": "Electrical Installation|21", "mode": "unit", "qty": 1}, {"lib": "Electrical Installation|11", "mode": "fixed", "qty": 1}, {"lib": "Electrical Installation|68", "mode": "fixed", "qty": 1}, {"lib": "Electrical Installation|65", "mode": "fixed", "qty": 1}, {"lib": "Electrical Installation|74", "mode": "fixed", "qty": 1}, {"lib": "Duct Installation|9", "mode": "unit", "qty": 1}]}, {"id": "l2", "name": "Level 8", "units": 3, "job": false, "lines": [{"lib": "Duct Installation|8", "mode": "unit", "qty": 2}, {"lib": "Electrical Installation|30", "mode": "unit", "qty": 2}, {"lib": "Electrical Installation|21", "mode": "unit", "qty": 1}, {"lib": "Electrical Installation|11", "mode": "fixed", "qty": 1}, {"lib": "Electrical Installation|68", "mode": "fixed", "qty": 1}, {"lib": "Electrical Installation|65", "mode": "fixed", "qty": 1}, {"lib": "Electrical Installation|74", "mode": "fixed", "qty": 1}, {"lib": "Duct Installation|9", "mode": "unit", "qty": 1}]}, {"id": "l3", "name": "Level 9", "units": 2, "job": false, "lines": [{"lib": "Duct Installation|8", "mode": "unit", "qty": 2}, {"lib": "Electrical Installation|30", "mode": "unit", "qty": 2}, {"lib": "Electrical Installation|21", "mode": "unit", "qty": 1}, {"lib": "Electrical Installation|11", "mode": "fixed", "qty": 1}, {"lib": "Electrical Installation|68", "mode": "fixed", "qty": 1}, {"lib": "Electrical Installation|65", "mode": "fixed", "qty": 1}, {"lib": "Electrical Installation|74", "mode": "fixed", "qty": 1}, {"lib": "Duct Installation|9", "mode": "unit", "qty": 1}]}, {"id": "l4", "name": "Level 10", "units": 2, "job": false, "lines": [{"lib": "Duct Installation|8", "mode": "unit", "qty": 2}, {"lib": "Electrical Installation|30", "mode": "unit", "qty": 2}, {"lib": "Electrical Installation|21", "mode": "unit", "qty": 1}, {"lib": "Electrical Installation|11", "mode": "fixed", "qty": 1}, {"lib": "Electrical Installation|68", "mode": "fixed", "qty": 1}, {"lib": "Electrical Installation|65", "mode": "fixed", "qty": 1}, {"lib": "Electrical Installation|74", "mode": "fixed", "qty": 1}, {"lib": "Duct Installation|9", "mode": "unit", "qty": 1}]}, {"id": "l5", "name": "Level 14", "units": 2, "job": false, "lines": [{"lib": "Duct Installation|8", "mode": "unit", "qty": 2}, {"lib": "Electrical Installation|30", "mode": "unit", "qty": 2}, {"lib": "Electrical Installation|21", "mode": "unit", "qty": 1}, {"lib": "Electrical Installation|11", "mode": "fixed", "qty": 1}, {"lib": "Electrical Installation|68", "mode": "fixed", "qty": 1}, {"lib": "Electrical Installation|65", "mode": "fixed", "qty": 1}, {"lib": "Electrical Installation|74", "mode": "fixed", "qty": 1}, {"lib": "Duct Installation|9", "mode": "unit", "qty": 1}]}]};
+let S = null;
+try{ const t = localStorage.getItem('vp-program-builder-v1'); if(t) S = JSON.parse(t); }catch(e){}
+if(!S) S = JSON.parse(JSON.stringify(DEFAULT));
+function save(){ try{ localStorage.setItem('vp-program-builder-v1', JSON.stringify(S)); }catch(e){} }
+
+/* ---------- dates ---------- */
+const iso = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const parse = s => { const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec((s||'').trim()); return m? new Date(+m[1],+m[2]-1,+m[3]) : null; };
+function closureSet(){ return new Set(S.closures.split(/\s+/).map(x=>x.trim()).filter(x=>parse(x))); }
+function isWork(d,cs){ const w=d.getDay(); return w!==0&&w!==6&&!cs.has(iso(d)); }
+function addDays(d,n){ const x=new Date(d.getFullYear(),d.getMonth(),d.getDate()+n); return x; }
+function firstWork(d,cs){ let x=new Date(d); while(!isWork(x,cs)) x=addDays(x,1); return x; }
+function nextWork(d,cs){ return firstWork(addDays(d,1),cs); }
+function finishFor(start,days,cs){ let x=new Date(start), n=1; while(n<days){ x=nextWork(x,cs); n++; } return x; }
+const fmt = d => d.toLocaleDateString('en-AU',{weekday:'short',day:'2-digit',month:'short',year:'2-digit'});
+const r2 = n => (Math.round(n*100)/100).toFixed(2);
+const r1 = n => (Math.round(n*10)/10).toFixed(1);
+
+/* ---------- calc ---------- */
+function lineQty(l,a){ return (l.mode==='unit' ? (+l.qty||0)*(+a.units||0) : (+l.qty||0)); }
+function lineHours(l){ // {stage:hoursEach}
+  if(l.lib && BYID[l.lib]) return BYID[l.lib].h;
+  return {[l.stage||'Rough in']: +l.each||0};
+}
+function lineWho(l){ return l.who || (l.lib&&BYID[l.lib]?BYID[l.lib].who:'VP'); }
+function build(){
+  const rows=[]; // {area,item,tab,who,stage,each,qty,total,custom}
+  S.areas.forEach(a=>a.lines.forEach(l=>{
+    const q=lineQty(l,a), h=lineHours(l), who=lineWho(l);
+    Object.keys(h).forEach(st=>{
+      rows.push({area:a.name,job:!!a.job,aid:a.id,item:l.lib&&BYID[l.lib]?BYID[l.lib].label:(l.label||'Custom line'),
+        ref:l.lib&&BYID[l.lib]?BYID[l.lib].tab+', row '+BYID[l.lib].row:'Custom: '+(l.reason||'no reason given'),
+        who,stage:st,each:h[st],qty:q,total:h[st]*q,custom:!l.lib,reason:l.reason});
+    });
+  }));
+  return rows;
+}
+function plan(rows){
+  const cs=closureSet(), start0=parse(S.start);
+  const warns=[]; if(!start0){ return {tasks:[],warns:['Enter a valid start date.'],cs}; }
+  const sumF=f=>rows.filter(f).reduce((s,r)=>s+r.total,0);
+  const people={VP:+S.own||0, DJB:+S.djb||0};
+  const days=(h,who)=>{ if(h<=0) return 0; const cap=(people[who]||0)*(+S.hpd||0); if(cap<=0){warns.push('Set a crew size and hours per day for '+who+'.');return 1;} return Math.max(1,Math.ceil(h*(+S.diff||1)/cap-1e-9)); };
+  const tasks=[]; let cursor=null; // finish of last VP task
+  const sHours=sumF(r=>r.who==='VP'&&(r.stage==='Site setup'||(r.job&&r.stage!=='Commissioning')));
+  let startAll=firstWork(start0,cs), prevM=null, prevE=null;
+  if(sHours>0){
+    const d=days(sHours,'VP'), st=startAll, fi=finishFor(st,d,cs);
+    tasks.push({id:'S1',name:'Site setup and job-level items',who:'VP',hours:sHours,people:people.VP,days:d,start:st,finish:fi,after:'On-site start'});
+    prevM=fi;
+  }
+  let n=0;
+  S.areas.filter(a=>!a.job).forEach(a=>{
+    n++;
+    const mh=rows.filter(r=>r.aid===a.id&&r.who==='VP'&&r.stage!=='Commissioning'&&r.stage!=='Site setup').reduce((s,r)=>s+r.total,0);
+    const eh=rows.filter(r=>r.aid===a.id&&r.who==='DJB').reduce((s,r)=>s+r.total,0);
+    let mFin=null;
+    if(mh>0){
+      const d=days(mh,'VP'), st=prevM?nextWork(prevM,cs):startAll, fi=finishFor(st,d,cs);
+      tasks.push({id:'M'+n,name:a.name+': our crew',who:'VP',hours:mh,people:people.VP,days:d,start:st,finish:fi,after:prevM?'previous VP task':'On-site start'});
+      prevM=fi; mFin=fi;
+    }
+    if(eh>0){
+      const d=days(eh,'DJB');
+      let base=mFin?nextWork(mFin,cs):(prevM?nextWork(prevM,cs):startAll);
+      if(prevE){ const x=nextWork(prevE,cs); if(x>base) base=x; }
+      const fi=finishFor(base,d,cs);
+      tasks.push({id:'E'+n,name:a.name+': DJB Electrical',who:'DJB',hours:eh,people:people.DJB,days:d,start:base,finish:fi,after:(mFin?'VP task, ':'')+(prevE?'previous DJB task':'')});
+      prevE=fi;
+    }
+  });
+  const ch=sumF(r=>r.who==='VP'&&r.stage==='Commissioning');
+  const dch=sumF(r=>r.who==='DJB'&&r.stage==='Commissioning');
+  if(ch>0||dch>0){
+    const latest=tasks.reduce((m,t)=>(!m||t.finish>m)?t.finish:m,null);
+    const st=latest?nextWork(latest,cs):startAll, d=days(ch+dch,'VP');
+    tasks.push({id:'C1',name:'Commission and balance, handover',who:'VP',hours:ch+dch,people:people.VP,days:d,start:st,finish:finishFor(st,d,cs),after:'All tasks'});
+  }
+  if(S.areas.some(a=>!a.job && a.lines.length===0)) warns.push('An area has no lines and is not on the program.');
+  return {tasks,warns,cs,start0};
+}
+
+/* ---------- render ---------- */
+const $ = id => document.getElementById(id);
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function libOptions(){
+  const groups={}; LIB.forEach(e=>{(groups[e.group]=groups[e.group]||[]).push(e)});
+  return Object.keys(groups).map(g=>'<optgroup label="'+esc(g)+'">'+groups[g].map(e=>'<option value="'+esc(e.id)+'">'+esc(e.label.slice(0,90))+'</option>').join('')+'</optgroup>').join('');
+}
+const OPTS = libOptions();
+function renderSettings(){
+  const f=[['name','Job name','text'],['ref','Quote reference','text'],['start','On-site start (YYYY-MM-DD)','text'],['own','Victorian Projects crew (people)','number'],['djb','DJB Electrical (people)','number'],['hpd','Hours per person per day','number'],['diff','Difficulty (Low 1.0, Medium 1.2, High 1.5)','number']];
+  $('settings').innerHTML=f.map(([k,l,t])=>'<div><label>'+l+'</label><input class="in" data-k="'+k+'" type="'+t+'" step="any" value="'+esc(S[k])+'"></div>').join('');
+  $('settings').querySelectorAll('input').forEach(i=>i.oninput=()=>{S[i.dataset.k]=i.type==='number'?(i.value===''?'':+i.value):i.value;recalc();});
+  syncMeta(); $('closures').value=S.closures; $('closures').oninput=e=>{S.closures=e.target.value;recalc();};
+}
+function renderAreas(){
+  const host=$('areas'); host.innerHTML='';
+  S.areas.forEach((a,ai)=>{
+    const div=document.createElement('div'); div.className='area';
+    let h='<div class="ah"><div style="min-width:200px;flex:1"><label>'+(a.job?'Job-level area':'Area (level, floor, zone)')+'</label><input class="in" data-f="name" value="'+esc(a.name)+'"></div>';
+    if(!a.job) h+='<div style="width:150px"><label>Units (e.g. offices)</label><input class="in" type="number" step="any" data-f="units" value="'+esc(a.units)+'"></div>';
+    h+='<button class="ghost small" data-act="dup">Duplicate</button><button class="danger small" data-act="del">Remove area</button></div>';
+    h+='<table><tr><th>Item (guideline row)</th><th style="width:130px">Quantity</th><th style="width:120px">Counted</th><th style="width:70px">Who</th><th class="num" style="width:150px">Hours each (stage)</th><th class="num" style="width:90px">Total h</th><th style="width:40px"></th></tr>';
+    a.lines.forEach((l,li)=>{
+      const lh=lineHours(l), q=lineQty(l,a);
+      const each=Object.keys(lh).map(s=>lh[s]+' '+s.toLowerCase()).join(', ');
+      const tot=Object.keys(lh).reduce((s,k)=>s+lh[k]*q,0);
+      const name=l.lib&&BYID[l.lib]?esc(BYID[l.lib].label):('<span class="custom">CUSTOM</span> '+esc(l.label||'')+'<div class="muted">Reason: '+esc(l.reason||'')+'</div>');
+      const ref=l.lib&&BYID[l.lib]?'<div class="muted">'+esc(BYID[l.lib].tab)+', row '+BYID[l.lib].row+'</div>':'';
+      h+='<tr data-li="'+li+'"><td>'+name+ref+'</td><td><input class="in" type="number" step="any" data-l="qty" value="'+esc(l.qty)+'"></td><td>'+(a.job?'fixed':'<select class="in" data-l="mode"><option value="unit"'+(l.mode==='unit'?' selected':'')+'>per unit</option><option value="fixed"'+(l.mode==='fixed'?' selected':'')+'>fixed</option></select>')+'</td><td><select data-l="who"><option'+(lineWho(l)==='VP'?' selected':'')+'>VP</option><option'+(lineWho(l)==='DJB'?' selected':'')+'>DJB</option></select></td><td class="num">'+esc(each)+'</td><td class="num">'+r2(tot)+'</td><td><button class="danger small" data-act="rm">x</button></td></tr>';
+    });
+    h+='</table><div class="row" style="padding:10px 14px;background:#fff"><div style="flex:1;min-width:260px"><label>Add a guideline row</label><select data-add><option value="">Choose a row...</option>'+OPTS+'</select></div><button class="small" data-act="add">Add line</button><button class="ghost small" data-act="cust">Add custom line</button></div>';
+    div.innerHTML=h; host.appendChild(div);
+    div.querySelectorAll('[data-f]').forEach(i=>i.oninput=()=>{a[i.dataset.f]=i.type==='number'?+i.value:i.value;recalc();});
+    div.querySelectorAll('tr[data-li]').forEach(tr=>{ const l=a.lines[+tr.dataset.li];
+      tr.querySelectorAll('[data-l]').forEach(i=>{ i.oninput=i.onchange=()=>{ const k=i.dataset.l; l[k]=(k==='qty')?(i.value===''?0:+i.value):i.value; recalc(k==='qty'?false:true); }; });
+    });
+    div.querySelectorAll('[data-act]').forEach(b=>b.onclick=()=>{
+      const act=b.dataset.act;
+      if(act==='del'){ S.areas.splice(ai,1); renderAreas(); recalc(); }
+      else if(act==='dup'){ const c=JSON.parse(JSON.stringify(a)); c.id='a'+Date.now(); c.name=a.name+' copy'; S.areas.splice(ai+1,0,c); renderAreas(); recalc(); }
+      else if(act==='rm'){ const li=+b.closest('tr').dataset.li; a.lines.splice(li,1); renderAreas(); recalc(); }
+      else if(act==='add'){ const v=div.querySelector('[data-add]').value; if(!v) return; a.lines.push({lib:v,mode:a.job?'fixed':'unit',qty:1}); renderAreas(); recalc(); }
+      else if(act==='cust'){ openCustom(a); }
+    });
+  });
+}
+function openCustom(a){
+  const box=document.createElement('div'); box.className='warn'; box.style.background='#fff'; box.style.borderColor='var(--hair)'; box.style.color='var(--body)';
+  box.innerHTML='<b>Custom line (not in the guideline)</b><div class="grid" style="margin-top:8px"><div><label>Description</label><input class="in" id="cl"></div><div><label>Hours each</label><input class="in" id="ce" type="number" step="any"></div><div><label>Stage</label><select class="in" id="cs">'+STAGES.map(s=>'<option>'+s+'</option>').join('')+'</select></div><div><label>Who</label><select class="in" id="cw"><option>VP</option><option>DJB</option></select></div><div style="grid-column:1/-1"><label>Why the guideline has no row for this (required)</label><input class="in" id="cr"></div></div><div class="row" style="margin-top:8px"><button class="small" id="cok">Add custom line</button><button class="ghost small" id="cno">Cancel</button></div>';
+  $('areas').prepend(box);
+  $('cno').onclick=()=>box.remove();
+  $('cok').onclick=()=>{ const l=$('cl').value.trim(), e=+$('ce').value, r=$('cr').value.trim(); if(!l||!(e>0)||!r){ $('cr').style.borderColor='#b42318'; return; }
+    a.lines.push({lib:null,label:l,each:e,stage:$('cs').value,who:$('cw').value,reason:r,mode:a.job?'fixed':'unit',qty:1}); box.remove(); renderAreas(); recalc(); };
+}
+function renderResults(rows,p){
+  const vp=rows.filter(r=>r.who==='VP').reduce((s,r)=>s+r.total,0), dj=rows.filter(r=>r.who==='DJB').reduce((s,r)=>s+r.total,0);
+  const fin=p.tasks.reduce((m,t)=>(!m||t.finish>m)?t.finish:m,null);
+  let wd=0; if(fin&&p.start0){ let x=firstWork(p.start0,p.cs); while(x<=fin){ wd++; x=nextWork(x,p.cs);} }
+  const units=S.areas.filter(a=>!a.job).reduce((s,a)=>s+(+a.units||0),0);
+  LAST={vp,djb:dj,days:wd,finish:fin?iso(fin):'',units};
+  $('tiles').innerHTML='<div class="tile"><b>'+(fin?fmt(fin):'-')+'</b><span>Finish on site</span></div><div class="tile"><b>'+wd+'</b><span>Working days on site</span></div><div class="tile"><b>'+r1(vp)+'</b><span>Victorian Projects hours</span></div><div class="tile"><b>'+r1(dj)+'</b><span>DJB Electrical hours</span></div><div class="tile"><b>'+units+'</b><span>Units across all areas</span></div>';
+  // gantt
+  if(!p.tasks.length){ $('gantt').innerHTML='<div style="padding:16px" class="muted">Add areas and lines to see the program.</div>'; }
+  else{
+    const cols=[]; let x=firstWork(p.start0,p.cs); while(x<=fin){ cols.push(new Date(x)); x=nextWork(x,p.cs); }
+    let h='<table><tr><th class="l">Task</th><th class="d" style="color:#fff;background:var(--navy);padding:2px 8px">Days</th>';
+    let lastM=-1; cols.forEach(d=>{ const m=d.getMonth(); h+='<th class="d" style="background:var(--navy);color:#fff">'+(m!==lastM?d.toLocaleDateString('en-AU',{month:'short'})+'<br>':'<br>')+d.getDate()+'</th>'; lastM=m; });
+    h+='</tr>';
+    p.tasks.forEach(t=>{
+      h+='<tr><td class="l">'+esc(t.id)+'  '+esc(t.name)+' <span class="muted">('+r1(t.hours)+' h, '+t.people+' people)</span></td><td class="num" style="padding:0 8px">'+t.days+'</td>';
+      cols.forEach(d=>{ const on=d>=t.start&&d<=t.finish; h+='<td class="c'+(on?' '+t.who:'')+'" title="'+esc(fmt(d))+'"></td>'; });
+      h+='</tr>';
+    });
+    h+='</table><div class="muted" style="padding:6px 10px"><span class="tag VP">VP</span> Victorian Projects crew &nbsp; <span class="tag DJB">DJB</span> DJB Electrical (subcontractor). Starts and finishes: '+p.tasks.map(t=>t.id+' '+iso(t.start).slice(5)+' to '+iso(t.finish).slice(5)).join('; ')+'</div>';
+    $('gantt').innerHTML=h;
+  }
+  $('warns').innerHTML=p.warns.concat(rows.filter(r=>r.custom).length?['Custom lines are on this program and are not guideline hours. Check them with Jen or Mat.']:[]).concat(p.tasks.some(t=>t.finish>=parse('2026-12-23')&&t.start<parse('2026-12-23'))?[]:[]).map(w=>'<div class="warn">'+esc(w)+'</div>').join('');
+  // hours table
+  const byArea={}; rows.forEach(r=>{ const k=r.area; (byArea[k]=byArea[k]||[]).push(r); });
+  let t='<table style="width:100%;border-collapse:collapse"><tr><th>Area</th><th>Item</th><th>Guideline row</th><th>Who</th><th>Stage</th><th class="num">Each</th><th class="num">Qty</th><th class="num">Total h</th></tr>';
+  rows.forEach(r=>{ t+='<tr><td>'+esc(r.area)+'</td><td>'+(r.custom?'<span class="custom">CUSTOM</span> ':'')+esc(r.item)+'</td><td class="muted">'+esc(r.ref)+'</td><td><span class="tag '+r.who+'">'+r.who+'</span></td><td>'+esc(r.stage)+'</td><td class="num">'+r.each+'</td><td class="num">'+r.qty+'</td><td class="num">'+r2(r.total)+'</td></tr>'; });
+  t+='<tr><td colspan="7"><b>Total, all</b></td><td class="num"><b>'+r2(vp+dj)+'</b></td></tr></table>';
+  $('hours').innerHTML=t;
+  // csv
+  const q=s=>'"'+String(s).replace(/"/g,'""')+'"';
+  let c='Program,'+q(S.name)+','+q(S.ref)+'\nTask,Who,Hours,People,Days,Start,Finish\n';
+  p.tasks.forEach(tk=>{ c+=[q(tk.id+' '+tk.name),tk.who,r2(tk.hours),tk.people,tk.days,iso(tk.start),iso(tk.finish)].join(',')+'\n'; });
+  c+='\nHours build\nArea,Item,Guideline row,Who,Stage,Each,Qty,Total hours\n';
+  rows.forEach(r=>{ c+=[q(r.area),q(r.item),q(r.ref),r.who,q(r.stage),r.each,r.qty,r2(r.total)].join(',')+'\n'; });
+  $('csv').value=c;
+}
+function recalc(skipAreas){
+  save(); const rows=build(); const p=plan(rows); renderResults(rows,p);
+  if(skipAreas!==false) { /* keep inputs focused: only refresh totals text by re-rendering areas on structure changes */ }
+  refreshTotals();
+}
+function refreshTotals(){ // update per-line totals without losing focus
+  document.querySelectorAll('#areas .area').forEach((div,ai)=>{ const a=S.areas[ai]; if(!a) return;
+    div.querySelectorAll('tr[data-li]').forEach(tr=>{ const l=a.lines[+tr.dataset.li]; const lh=lineHours(l), q=lineQty(l,a);
+      tr.children[5].textContent=r2(Object.keys(lh).reduce((s,k)=>s+lh[k]*q,0)); });
+  });
+}
+$('addArea').onclick=()=>{ S.areas.push({id:'a'+Date.now(),name:'New area',units:1,job:false,lines:[]}); renderAreas(); recalc(); };
+$('addJob').onclick=()=>{ if(S.areas.some(a=>a.job)) return; S.areas.unshift({id:'a'+Date.now(),name:'Job level',units:1,job:true,lines:[]}); renderAreas(); recalc(); };
+$('reset').onclick=()=>{ S=JSON.parse(JSON.stringify(DEFAULT)); renderSettings(); renderAreas(); recalc(); };
+$('copyCsv').onclick=async()=>{ const ta=$('csv'); ta.select(); try{ await navigator.clipboard.writeText(ta.value); $('copyMsg').textContent='Copied.'; }catch(e){ $('copyMsg').textContent='Copy blocked here. The text is selected, press Ctrl+C.'; } };
+
+/* ---------- history ---------- */
+let HIST=[], LAST={vp:0,djb:0,days:0,finish:'',units:0}, hmode='local', hdb=null, hloaded=false;
+const HKEY='vp-program-history-v1';
+function histLocalLoad(){ try{ HIST=JSON.parse(localStorage.getItem(HKEY)||'[]'); }catch(e){ HIST=[]; } }
+function histLocalSave(){ try{ localStorage.setItem(HKEY,JSON.stringify(HIST)); }catch(e){} }
+const GH={owner:'vpstock',repo:'vp-program-builder',branch:'main',path:'data/history.json'};
+const b64e=s=>btoa(unescape(encodeURIComponent(s)));
+const b64d=s=>decodeURIComponent(escape(atob(s.replace(/\s/g,''))));
+function ghToken(){ try{ return localStorage.getItem('vp-pb-token')||''; }catch(e){ return ''; } }
+async function ghGet(){ // returns {list, sha}
+  const tok=ghToken();
+  if(tok){
+    const r=await fetch('https://api.github.com/repos/'+GH.owner+'/'+GH.repo+'/contents/'+GH.path+'?ref='+GH.branch+'&t='+Date.now(),{headers:{Authorization:'Bearer '+tok,Accept:'application/vnd.github+json'}});
+    if(r.status===404) return {list:[],sha:null};
+    if(!r.ok) throw new Error('GitHub '+r.status);
+    const j=await r.json(); const o=JSON.parse(b64d(j.content)); return {list:o.programs||[],sha:j.sha};
+  }
+  const r=await fetch(GH.path+'?t='+Date.now()); if(!r.ok) return {list:[],sha:null};
+  const o=await r.json(); return {list:o.programs||[],sha:null};
+}
+async function ghMutate(fn,msg){
+  const tok=ghToken(); if(!tok) throw new Error('No GitHub token set');
+  for(let attempt=0;attempt<2;attempt++){
+    const cur=await ghGet(); const list=fn(cur.list.slice());
+    const body={message:msg,branch:GH.branch,content:b64e(JSON.stringify({programs:list},null,1))}; if(cur.sha) body.sha=cur.sha;
+    const r=await fetch('https://api.github.com/repos/'+GH.owner+'/'+GH.repo+'/contents/'+GH.path,{method:'PUT',headers:{Authorization:'Bearer '+tok,Accept:'application/vnd.github+json','Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(r.ok){ HIST=list; renderHistory(); return; }
+    if(r.status!==409&&r.status!==422) throw new Error('GitHub '+r.status);
+  }
+  throw new Error('GitHub kept refusing the save (conflict). Reload and try again.');
+}
+async function initHistory(){
+  histLocalLoad();
+  $('ghtoken').value=ghToken()?'(saved in this browser)':'';
+  try{
+    const g=await ghGet(); hmode=ghToken()?'github':'readonly'; HIST=g.list; hloaded=true;
+    $('histNote').textContent=ghToken()?'Saved to GitHub (vpstock/vp-program-builder, data/history.json). Shared with everyone who opens this page.':'Showing the shared history. Add your GitHub token below to save changes to it.';
+  }catch(e){
+    hmode='local'; $('histNote').textContent='Could not reach the shared history ('+((e&&e.message)||'offline')+'). Showing what is saved in this browser only.';
+  }
+  renderHistory();
+}
+function sortHist(){ HIST.sort((a,b)=>String(b.savedAt||'').localeCompare(String(a.savedAt||''))); }
+function snapshotDoc(){
+  const keep=JSON.parse(JSON.stringify(S)); delete keep.hid;
+  const old=HIST.find(h=>h.id===S.hid)||{};
+  return {name:S.name||'Untitled',ref:S.ref||'',status:S.status||'Quoted',notes:S.notes||'',savedAt:new Date().toISOString(),
+    units:LAST.units,vp:Math.round(LAST.vp*100)/100,djb:Math.round(LAST.djb*100)/100,days:LAST.days,finish:LAST.finish,
+    actualVp:old.actualVp===undefined?null:old.actualVp,actualDjb:old.actualDjb===undefined?null:old.actualDjb,stateJson:JSON.stringify(keep)};
+}
+async function saveHist(asNew){
+  const id=(!asNew&&S.hid)?S.hid:('p'+Date.now().toString(36)+Math.random().toString(36).slice(2,6));
+  const doc=snapshotDoc(); const rec=Object.assign({id},doc);
+  try{
+    if(hmode==='github'){ await ghMutate(l=>{ const i=l.findIndex(h=>h.id===id); if(i>=0) l[i]=rec; else l.unshift(rec); return l; },'Save program: '+doc.name); }
+    else { const i=HIST.findIndex(h=>h.id===id); if(i>=0) HIST[i]=rec; else HIST.unshift(rec); histLocalSave(); renderHistory(); }
+    S.hid=id; save();
+    $('saveMsg').textContent=(hmode==='github'?'Saved to GitHub: ':'Saved in this browser only (add a GitHub token to share it): ')+'"'+doc.name+'" at '+new Date().toLocaleTimeString('en-AU')+'.';
+  }catch(e){ $('saveMsg').textContent='Could not save: '+((e&&e.message)||'blocked'); }
+}
+async function histUpdate(id,fields){
+  try{
+    if(hmode==='github') await ghMutate(l=>{ const h=l.find(x=>x.id===id); if(h) Object.assign(h,fields); return l; },'Update program '+id);
+    else { const h=HIST.find(x=>x.id===id); if(h){ Object.assign(h,fields); histLocalSave(); renderHistory(); } }
+  }catch(e){ $('histNote').textContent='Could not update: '+((e&&e.message)||'blocked'); }
+}
+async function histDelete(id){
+  try{
+    if(hmode==='github') await ghMutate(l=>l.filter(h=>h.id!==id),'Delete program '+id);
+    else { HIST=HIST.filter(h=>h.id!==id); histLocalSave(); renderHistory(); }
+    if(S.hid===id){ delete S.hid; save(); }
+  }catch(e){ $('histNote').textContent='Could not delete: '+((e&&e.message)||'blocked'); }
+}
+function filteredHist(){
+  const q=$('hq').value.trim().toLowerCase(), st=$('hs').value;
+  return HIST.filter(h=>(!st||h.status===st)&&(!q||((h.name||'')+' '+(h.ref||'')+' '+(h.notes||'')).toLowerCase().includes(q)));
+}
+function renderHistory(){
+  const list=filteredHist();
+  const withUnits=list.filter(h=>h.units>0);
+  const tot=withUnits.reduce((s,h)=>({u:s.u+h.units,v:s.v+h.vp,d:s.d+h.djb}),{u:0,v:0,d:0});
+  const act=list.filter(h=>h.actualVp>0||h.actualDjb>0);
+  const est=act.reduce((s,h)=>s+h.vp+h.djb,0), actual=act.reduce((s,h)=>s+(+h.actualVp||0)+(+h.actualDjb||0),0);
+  $('hTiles').innerHTML='<div class="tile"><b>'+list.length+'</b><span>Programs shown</span></div>'+
+   '<div class="tile"><b>'+(tot.u?r1((tot.v+tot.d)/tot.u):'-')+'</b><span>Average hours per unit (all trades)</span></div>'+
+   '<div class="tile"><b>'+(tot.u?r1(tot.v/tot.u)+' / '+r1(tot.d/tot.u):'-')+'</b><span>Our crew / DJB hours per unit</span></div>'+
+   '<div class="tile"><b>'+(act.length&&est?Math.round(actual/est*100)+'%':'-')+'</b><span>Actual vs programmed hours ('+act.length+' with actuals)</span></div>';
+  if(!list.length){ $('histTable').innerHTML='<div class="muted" style="padding:8px 0">No saved programs yet. Build one above and press Save to history.</div>'; return; }
+  let h='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><tr><th>Job</th><th>Reference</th><th>Status</th><th>Saved</th><th class="num">Units</th><th class="num">Our h</th><th class="num">DJB h</th><th class="num">Days</th><th>Finish</th><th class="num">h per unit</th><th style="width:90px">Actual our h</th><th style="width:90px">Actual DJB h</th><th></th></tr>';
+  list.forEach(e=>{
+    const per=e.units>0?r1((e.vp+e.djb)/e.units):'-';
+    h+='<tr data-id="'+esc(e.id)+'"><td><b>'+esc(e.name)+'</b>'+(e.notes?'<div class="muted">'+esc(e.notes)+'</div>':'')+'</td><td>'+esc(e.ref)+'</td><td><select data-h="status">'+['Quoted','Won','In progress','Complete','Lost'].map(s=>'<option'+(e.status===s?' selected':'')+'>'+s+'</option>').join('')+'</select></td><td class="muted">'+esc((e.savedAt||'').slice(0,10))+'</td><td class="num">'+esc(e.units)+'</td><td class="num">'+r1(e.vp)+'</td><td class="num">'+r1(e.djb)+'</td><td class="num">'+esc(e.days)+'</td><td class="muted">'+esc(e.finish||'')+'</td><td class="num">'+per+'</td><td><input data-h="actualVp" type="number" step="any" value="'+(e.actualVp==null?'':e.actualVp)+'"></td><td><input data-h="actualDjb" type="number" step="any" value="'+(e.actualDjb==null?'':e.actualDjb)+'"></td><td style="white-space:nowrap"><button class="small" data-hact="load">Load</button> <button class="danger small" data-hact="del">Delete</button></td></tr>';
+  });
+  h+='</table></div>';
+  $('histTable').innerHTML=h;
+  $('histTable').querySelectorAll('tr[data-id]').forEach(tr=>{
+    const id=tr.dataset.id;
+    tr.querySelectorAll('[data-h]').forEach(i=>i.onchange=()=>{ const k=i.dataset.h; histUpdate(id,{[k]:(k==='status')?i.value:(i.value===''?null:+i.value)}); });
+    tr.querySelector('[data-hact=load]').onclick=()=>{ const e=HIST.find(x=>x.id===id); if(!e) return; try{ S=JSON.parse(e.stateJson); S.hid=id; S.status=e.status; S.notes=e.notes; }catch(x){ return; } renderSettings(); renderAreas(); recalc(); window.scrollTo(0,0); $('saveMsg').textContent='Loaded "'+e.name+'". Press Save to history to overwrite it, or Save as new entry for a copy.'; };
+    tr.querySelector('[data-hact=del]').onclick=function(){ if(this.dataset.sure){ histDelete(id); } else { this.dataset.sure='1'; this.textContent='Sure?'; setTimeout(()=>{ this.dataset.sure=''; this.textContent='Delete'; },3000); } };
+  });
+}
+function histCsv(){
+  const q=s=>'"'+String(s==null?'':s).replace(/"/g,'""')+'"';
+  let c='Job,Reference,Status,Saved,Units,Our crew hours,DJB hours,Days,Finish,Hours per unit,Actual our hours,Actual DJB hours,Notes\n';
+  filteredHist().forEach(e=>{ c+=[q(e.name),q(e.ref),q(e.status),q((e.savedAt||'').slice(0,10)),e.units,e.vp,e.djb,e.days,q(e.finish),e.units>0?r2((e.vp+e.djb)/e.units):'',e.actualVp==null?'':e.actualVp,e.actualDjb==null?'':e.actualDjb,q(e.notes)].join(',')+'\n'; });
+  return c;
+}
+$('saveTok').onclick=()=>{ const v=$('ghtoken').value.trim(); if(v&&!v.startsWith('(')){ try{ localStorage.setItem('vp-pb-token',v); }catch(e){} initHistory(); } };
+$('clearTok').onclick=()=>{ try{ localStorage.removeItem('vp-pb-token'); }catch(e){} initHistory(); };
+$('refreshHist').onclick=()=>initHistory();
+$('saveHist').onclick=()=>saveHist(false);
+$('saveNew').onclick=()=>saveHist(true);
+$('hq').oninput=renderHistory; $('hs').onchange=renderHistory;
+$('copyHist').onclick=async()=>{ try{ await navigator.clipboard.writeText(histCsv()); $('histNote').textContent='History copied as CSV.'; }catch(e){ $('csv').value=histCsv(); $('csv').select(); $('histNote').textContent='Copy blocked here. The history CSV is in the box under Copy out, press Ctrl+C.'; } };
+$('status').onchange=e=>{ S.status=e.target.value; save(); };
+$('notes').oninput=e=>{ S.notes=e.target.value; save(); };
+function syncMeta(){ $('status').value=S.status||'Quoted'; $('notes').value=S.notes||''; }
+
+renderSettings(); renderAreas(); recalc(); initHistory();
+</script>
+</body>
+</html>

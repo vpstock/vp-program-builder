@@ -163,7 +163,7 @@ textarea.csv{height:140px;font-family:ui-monospace,Menlo,monospace;font-size:12p
 </section>
 </div>
 <div id="previewView" hidden>
-<div class="pvbar row" style="margin-bottom:12px"><button class="ghost" id="pvBack">Back to program</button><button id="pvPrint">Save as PDF</button><span class="muted">This is the version for the builder. It shows no hours, crew sizes or costs. A print window opens: set Destination to <b>Save as PDF</b>, then press Save.</span></div>
+<div class="pvbar row" style="margin-bottom:12px"><button class="ghost" id="pvBack">Back to program</button><button id="pvPrint">Download PDF</button><span class="muted" id="pvMsg">This is the version for the builder. It shows no hours, crew sizes or costs.</span></div>
 <div id="previewDoc"></div>
 </div>
 </main>
@@ -519,7 +519,22 @@ $('newProg').onclick=()=>{ S=blankProgram(); openDetail(); };
 $('backBtn').onclick=()=>{ showView('list'); renderHistory(); };
 $('previewBtn').onclick=renderPreview;
 $('pvBack').onclick=()=>showView('detail');
-$('pvPrint').onclick=()=>{ try{ window.print(); }catch(e){} };
+function loadH2P(){ return window.html2pdf?Promise.resolve():new Promise((ok,no)=>{ const t=document.createElement('script'); t.src='vendor/html2pdf.bundle.min.js'; t.onload=ok; t.onerror=()=>no(new Error('PDF tool did not load')); document.head.appendChild(t); }); }
+$('pvPrint').onclick=async()=>{
+  const btn=$('pvPrint'), msg=$('pvMsg'), el=document.querySelector('#previewDoc .pvdoc'); if(!el) return;
+  btn.disabled=true; msg.textContent='Making the PDF...';
+  try{
+    await loadH2P();
+    var oldCss=el.style.cssText; el.style.boxShadow='none'; el.style.border='0'; el.style.borderRadius='0';
+    const name=((S.ref||'Program')+' Program summary.pdf').replace(/[\\/:*?"<>|]/g,'-');
+    const w=html2pdf().set({margin:0,image:{type:'jpeg',quality:0.98},html2canvas:{scale:3,backgroundColor:'#ffffff',useCORS:true},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}}).from(el);
+    const c=await w.toCanvas().get('canvas');
+    const asp=c.height/c.width; let m=0; if(asp>297/210) m=(210-297/asp)/2;
+    await w.set({margin:[0,m,0,m]}).toPdf().save(name); el.style.cssText=oldCss;
+    msg.textContent='Saved '+name+' to your downloads.';
+  }catch(e){ el.style.cssText=''; msg.textContent='Could not make the PDF: '+((e&&e.message)||'blocked'); }
+  btn.disabled=false;
+};
 $('delBtn').onclick=function(){ if(this.dataset.sure){ this.dataset.sure=''; this.textContent='Delete'; const id=S.hid; histDelete(id).then(()=>{ showView('list'); renderHistory(); }); } else { this.dataset.sure='1'; this.textContent='Sure? Click again'; setTimeout(()=>{ this.dataset.sure=''; this.textContent='Delete'; },3000); } };
 function histCsv(){
   const q=s=>'"'+String(s==null?'':s).replace(/"/g,'""')+'"';

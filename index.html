@@ -107,6 +107,7 @@ textarea.csv{height:140px;font-family:ui-monospace,Menlo,monospace;font-size:12p
 <p>Pick the items from the estimating guideline, enter the quantities, and get the hours and a program. </p>
 </header>
 <main>
+<input id="attInput" type="file" multiple style="display:none">
 <div id="listView"><section class="card">
 <div class="row" style="justify-content:space-between;margin-bottom:12px"><h2>Jobs and quotes</h2>
 <div class="row"><div style="width:240px"><input id="hq" placeholder="Search number or name"></div><button id="newProg">New quote</button></div></div>
@@ -143,12 +144,6 @@ textarea.csv{height:140px;font-family:ui-monospace,Menlo,monospace;font-size:12p
 <div class="note" id="saveMsg"></div>
 </section>
 
-<section class="card" id="attCard">
-<h2>Attachments</h2>
-<label id="attDrop" style="display:block;border:2px dashed #b9c6e6;border-radius:8px;padding:18px;text-align:center;background:#f7f9ff;cursor:pointer;color:#0a1a4d;font-weight:600">Drop the quote files here, or click to choose<input id="attInput" type="file" multiple style="display:none"></label>
-<div class="note" id="attMsg">Files upload as soon as you add them, and stay with this quote.</div>
-<div id="attList"></div>
-</section>
 
 <section class="card">
 <div class="row" style="justify-content:space-between;margin-bottom:8px"><h2>Areas and quantities</h2>
@@ -180,7 +175,7 @@ textarea.csv{height:140px;font-family:ui-monospace,Menlo,monospace;font-size:12p
 </div>
 <div id="attModal" hidden style="position:fixed;inset:0;background:rgba(10,26,77,.65);z-index:50;padding:3vh 3vw">
 <div style="background:#fff;border-radius:8px;height:100%;display:flex;flex-direction:column;overflow:hidden">
-<div class="row" style="padding:10px 14px;border-bottom:1px solid #dfe4ec;align-items:center"><b id="attTitle" style="flex:1"></b><button class="ghost" id="attDl">Download</button><button id="attClose">Close</button></div>
+<div class="row" style="padding:10px 14px;border-bottom:1px solid #dfe4ec;align-items:center"><b id="attTitle" style="flex:1"></b><button class="ghost" id="attDl">Download</button><button class="danger" id="attRm">Remove</button><button id="attClose">Close</button></div>
 <div id="attBody" style="flex:1;overflow:auto;background:#f7f8fa;display:flex;align-items:center;justify-content:center"></div>
 </div></div>
 <div id="tasksView" hidden>
@@ -433,11 +428,11 @@ function snapshotDoc(){
   const keep=JSON.parse(JSON.stringify(S)); delete keep.hid;
   return {name:S.name||'Untitled',ref:S.ref||'',status:S.status||'Quoted',notes:S.notes||'',savedAt:new Date().toISOString(),
     units:LAST.units,vp:Math.round(LAST.vp*100)/100,djb:Math.round(LAST.djb*100)/100,days:LAST.days,finish:LAST.finish,
-    files:S.files||[],actualVp:(S.actualVp===''||S.actualVp==null)?null:+S.actualVp,actualDjb:(S.actualDjb===''||S.actualDjb==null)?null:+S.actualDjb,stateJson:JSON.stringify(keep)};
+    files:((HIST.find(h=>h.id===S.hid)||{}).files)||[],actualVp:(S.actualVp===''||S.actualVp==null)?null:+S.actualVp,actualDjb:(S.actualDjb===''||S.actualDjb==null)?null:+S.actualDjb,stateJson:JSON.stringify(keep)};
 }
 async function saveHist(asNew){
   const id=(!asNew&&S.hid)?S.hid:('p'+Date.now().toString(36)+Math.random().toString(36).slice(2,6));
-  if(asNew) S.files=[]; const doc=snapshotDoc(); const rec=Object.assign({id},doc);
+  const doc=snapshotDoc(); if(asNew) doc.files=[]; const rec=Object.assign({id},doc);
   try{
     if(hmode==='github'){ await ghMutate(l=>{ const i=l.findIndex(h=>h.id===id); if(i>=0) l[i]=rec; else l.unshift(rec); return l; },'Save program: '+doc.name); }
     else { const i=HIST.findIndex(h=>h.id===id); if(i>=0) HIST[i]=rec; else HIST.unshift(rec); histLocalSave(); renderHistory(); }
@@ -489,13 +484,14 @@ function renderHistory(){
   const sec=(title,arr,empty)=>{
     let h='<h3 style="margin:14px 0 6px;font-size:16px">'+title+' <span class="muted" style="font-weight:400">('+arr.length+')</span></h3>';
     if(!arr.length) return h+'<div class="muted" style="padding:4px 0 8px">'+empty+'</div>';
-    h+='<table style="width:100%;border-collapse:collapse"><tr><th>Number</th><th>Name</th><th style="width:120px">Quote file</th><th style="width:150px">Status</th></tr>';
-    arr.forEach(e=>{ h+='<tr class="jobrow" data-id="'+esc(e.id)+'"><td class="num">'+esc(e.ref||'(no number)')+'</td><td>'+esc(e.name)+'</td><td>'+((e.files&&e.files.length)?'<button class="ghost qf" data-id="'+esc(e.id)+'" style="padding:4px 10px">View'+(e.files.length>1?' ('+e.files.length+')':'')+'</button>':'<span class="muted">None</span>')+'</td><td>'+stSel(e)+'</td></tr>'; });
+    h+='<table style="width:100%;border-collapse:collapse"><tr><th>Number</th><th>Name</th><th style="width:230px">Quote file</th><th style="width:150px">Status</th></tr>';
+    arr.forEach(e=>{ h+='<tr class="jobrow" data-id="'+esc(e.id)+'"><td class="num">'+esc(e.ref||'(no number)')+'</td><td>'+esc(e.name)+'</td><td>'+((e.files&&e.files.length)?e.files.map((f,i)=>'<button class="ghost qf" data-id="'+esc(e.id)+'" data-i="'+i+'" style="padding:4px 10px;margin-right:4px">View'+(e.files.length>1?' '+(i+1):'')+'</button>').join(''):'')+'<button class="ghost qa" data-id="'+esc(e.id)+'" style="padding:4px 10px">'+((e.files&&e.files.length)?'+ Add':'Attach quote')+'</button></td><td>'+stSel(e)+'</td></tr>'; });
     return h+'</table>';
   };
   $('histTable').innerHTML=sec('Quotes',list.filter(e=>!isJob(e.status)),'No open quotes.')+sec('Jobs',list.filter(e=>isJob(e.status)),'No approved jobs yet. Change a quote status to Won to move it here.');
   $('histTable').querySelectorAll('tr.jobrow').forEach(tr=>tr.onclick=()=>openJob(tr.dataset.id));
-  $('histTable').querySelectorAll('button.qf').forEach(bt=>bt.onclick=ev=>{ ev.stopPropagation(); const e=HIST.find(x=>x.id===bt.dataset.id); if(e&&e.files&&e.files.length) previewFile(e.files[0]); });
+  $('histTable').querySelectorAll('button.qf').forEach(bt=>bt.onclick=ev=>{ ev.stopPropagation(); const e=HIST.find(x=>x.id===bt.dataset.id); if(e&&e.files&&e.files[+bt.dataset.i]) previewFile(e.files[+bt.dataset.i],e.id,+bt.dataset.i); });
+  $('histTable').querySelectorAll('button.qa').forEach(bt=>bt.onclick=ev=>{ ev.stopPropagation(); attTarget=bt.dataset.id; $('attInput').click(); });
   $('histTable').querySelectorAll('select.stsel').forEach(sl=>{ sl.onclick=ev=>ev.stopPropagation(); sl.onchange=ev=>{ ev.stopPropagation(); histUpdate(sl.dataset.id,{status:sl.value}); }; });
 }
 const EXTRAS={builder:'',pm:'',unitLabel:'units',glance:'',needs:'Access to each area when we need it, with ceilings left open until our work is in.\nSite access, lay down area, and temporary power and lighting.\nYour nominated program.',conds:'Start is on written approval of price and time.\nNormal working hours, no after hours work. Durations assume continuous access.\nOur crew is closed from 23 December to 5 January, and this is not counted in the working days.\nMaterial lead times may affect the start.',actualVp:null,actualDjb:null};
@@ -507,10 +503,10 @@ function showView(v){ ['list','detail','preview','tasks'].forEach(k=>$(k+'View')
 function openJob(id){
   const e=HIST.find(x=>x.id===id); if(!e) return;
   let st; try{ st=JSON.parse(e.stateJson); }catch(x){ return; }
-  S=Object.assign(JSON.parse(JSON.stringify(EXTRAS)),st); S.hid=id; S.status=e.status; S.notes=e.notes; S.actualVp=e.actualVp; S.actualDjb=e.actualDjb; S.files=e.files||[];
+  S=Object.assign(JSON.parse(JSON.stringify(EXTRAS)),st); S.hid=id; S.status=e.status; S.notes=e.notes; S.actualVp=e.actualVp; S.actualDjb=e.actualDjb;
   openDetail();
 }
-function openDetail(){ renderSettings(); renderAreas(); recalc(); renderAttach(); $('detailTitle').textContent=(S.ref||'New program')+(S.name?'  '+S.name:''); $('saveMsg').textContent=''; $('delBtn').style.display=S.hid?'':'none'; showView('detail'); }
+function openDetail(){ renderSettings(); renderAreas(); recalc(); $('detailTitle').textContent=(S.ref||'New program')+(S.name?'  '+S.name:''); $('saveMsg').textContent=''; $('delBtn').style.display=S.hid?'':'none'; showView('detail'); }
 function lines(s){ return String(s||'').split('\n').map(x=>x.trim()).filter(Boolean); }
 function renderPreview(){
   const rows=build(), p=plan(rows);
@@ -635,57 +631,43 @@ async function atBlob(f){
 let attUrl='';
 function closeAtt(){ $('attModal').hidden=true; $('attBody').innerHTML=''; if(attUrl){ URL.revokeObjectURL(attUrl); attUrl=''; } }
 function saveBlob(blob,name){ const u=URL.createObjectURL(blob), a=document.createElement('a'); a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),4000); }
-function previewAtt(i){ return previewFile((S.files||[])[i]); }
-async function previewFile(f){
-  if(!f) return; $('attMsg').textContent='Opening '+f.name+'...'; $('histNote').textContent='Opening '+f.name+'...';
+async function previewFile(f,id,idx){
+  if(!f) return; $('histNote').textContent='Opening '+f.name+'...';
   try{
     const blob=await atBlob(f); const t=fileType(f.name,f.type); attUrl=URL.createObjectURL(blob);
-    $('attTitle').textContent=f.name; $('attDl').onclick=()=>saveBlob(blob,f.name);
+    $('attTitle').textContent=f.name; $('attDl').onclick=()=>saveBlob(blob,f.name); const rm=$('attRm'); rm.textContent='Remove'; rm.dataset.sure=''; rm.onclick=()=>{ if(!rm.dataset.sure){ rm.dataset.sure='1'; rm.textContent='Sure? Click again'; setTimeout(()=>{ rm.dataset.sure=''; rm.textContent='Remove'; },3500); return; } removeFileFrom(id,idx); };
     $('attBody').innerHTML=''; let el;
     if(t==='application/pdf'){ el=document.createElement('iframe'); el.src=attUrl; el.style.cssText='border:0;width:100%;height:100%'; }
     else if(t.indexOf('image/')===0){ el=document.createElement('img'); el.src=attUrl; el.style.cssText='max-width:100%;max-height:100%'; }
     else { el=document.createElement('div'); el.style.cssText='padding:30px;text-align:center'; el.textContent='No preview for this file type. Use Download to open it.'; }
-    $('attBody').appendChild(el); $('attModal').hidden=false; $('attMsg').textContent=''; $('histNote').textContent='';
-  }catch(e){ $('attMsg').textContent='Could not open the file: '+((e&&e.message)||'blocked'); $('histNote').textContent='Could not open the file: '+((e&&e.message)||'blocked'); }
+    $('attBody').appendChild(el); $('attModal').hidden=false; $('histNote').textContent='';
+  }catch(e){ $('histNote').textContent='Could not open the file: '+((e&&e.message)||'blocked'); }
 }
-function renderAttach(){
-  const fs=S.files||[]; let h='';
-  if(!fs.length) h='<div class="muted" style="padding:8px 0">Nothing attached yet.</div>';
-  else{ h='<table style="width:100%;border-collapse:collapse"><tr><th>File</th><th style="width:90px">Size</th><th style="width:110px">Added</th><th style="width:250px"></th></tr>';
-    fs.forEach((f,i)=>{ h+='<tr><td>'+esc(f.name)+(f.local?' <span class="muted">(this browser only)</span>':'')+'</td><td class="muted">'+esc(fmtSize(f.size||0))+'</td><td class="muted">'+esc((f.added||'').slice(0,10))+'</td><td style="text-align:right"><button class="ghost" data-a="pv" data-i="'+i+'">Preview</button> <button class="ghost" data-a="dl" data-i="'+i+'">Download</button> <button class="danger" data-a="rm" data-i="'+i+'">Remove</button></td></tr>'; });
-    h+='</table>'; }
-  $('attList').innerHTML=h;
-  $('attList').querySelectorAll('button').forEach(b=>b.onclick=async()=>{
-    const i=+b.dataset.i, f=S.files[i];
-    if(b.dataset.a==='pv') return previewAtt(i);
-    if(b.dataset.a==='dl'){ try{ saveBlob(await atBlob(f),f.name); }catch(e){ $('attMsg').textContent='Could not download: '+((e&&e.message)||'blocked'); } return; }
-    if(!b.dataset.sure){ b.dataset.sure='1'; b.textContent='Sure? Click again'; setTimeout(()=>{ b.dataset.sure=''; b.textContent='Remove'; },3500); return; }
-    try{ if(f.local) await idbDel(f.path); else await ghDelFile(f.path); S.files.splice(i,1); await histUpdate(S.hid,{files:S.files}); renderAttach(); $('attMsg').textContent='Removed '+f.name+'.'; }catch(e){ $('attMsg').textContent='Could not remove: '+((e&&e.message)||'blocked'); }
-  });
-}
-async function addFiles(list){
-  const files=Array.from(list||[]); if(!files.length) return;
-  if(!S.hid){ $('attMsg').textContent='Saving the quote first...'; await saveHist(false); if(!S.hid){ $('attMsg').textContent='Could not save the quote, so nothing was attached.'; return; } }
-  if(!S.files) S.files=[]; let done=0;
+function attNote(t){ $('histNote').textContent=t; }
+async function addFilesTo(id,list){
+  const files=Array.from(list||[]); const e=HIST.find(x=>x.id===id); if(!files.length||!e) return;
+  let fs=(e.files||[]).slice(), done=0;
   for(const file of files){
-    if(file.size>AT_MAX){ $('attMsg').textContent=file.name+' is over 25 MB, so it was skipped.'; continue; }
-    $('attMsg').textContent='Uploading '+file.name+'...';
-    const path='attachments/'+S.hid+'/'+Date.now().toString(36)+'-'+safeName(file.name), local=hmode!=='github';
+    if(file.size>AT_MAX){ attNote(file.name+' is over 25 MB, so it was skipped.'); continue; }
+    attNote('Uploading '+file.name+'...');
+    const path='attachments/'+id+'/'+Date.now().toString(36)+'-'+safeName(file.name), local=hmode!=='github';
     try{
       if(local) await idbPut(path,file); else await ghPutFile(path,file);
-      S.files.push({name:file.name,path,size:file.size,type:fileType(file.name,file.type),added:new Date().toISOString(),local});
-      await histUpdate(S.hid,{files:S.files}); done++; renderAttach();
-    }catch(e){ $('attMsg').textContent='Could not upload '+file.name+': '+((e&&e.message)||'blocked'); return; }
+      fs.push({name:file.name,path,size:file.size,type:fileType(file.name,file.type),added:new Date().toISOString(),local});
+      await histUpdate(id,{files:fs}); done++;
+    }catch(x){ attNote('Could not upload '+file.name+': '+((x&&x.message)||'blocked')); return; }
   }
-  if(done) $('attMsg').textContent=done+' file'+(done>1?'s':'')+' attached.'+(hmode==='github'?'':' Saved in this browser only. Add the GitHub token to upload for everyone.');
+  if(done) attNote(done+' file'+(done>1?'s':'')+' attached.'+(hmode==='github'?'':' Saved in this browser only. Add the GitHub token to upload for everyone.'));
 }
-$('attInput').onchange=e=>{ addFiles(e.target.files); e.target.value=''; };
+async function removeFileFrom(id,i){
+  const e=HIST.find(x=>x.id===id); if(!e||!e.files||!e.files[i]) return; const f=e.files[i], fs=e.files.slice();
+  try{ if(f.local) await idbDel(f.path); else await ghDelFile(f.path); fs.splice(i,1); await histUpdate(id,{files:fs}); attNote('Removed '+f.name+'.'); closeAtt(); }
+  catch(x){ attNote('Could not remove: '+((x&&x.message)||'blocked')); }
+}
+let attTarget='';
+$('attInput').onchange=e=>{ addFilesTo(attTarget,e.target.files); e.target.value=''; };
 $('attClose').onclick=closeAtt;
 $('attModal').onclick=e=>{ if(e.target===$('attModal')) closeAtt(); };
-const dz=$('attDrop');
-['dragenter','dragover'].forEach(t=>dz.addEventListener(t,e=>{ e.preventDefault(); dz.style.background='#eef3ff'; }));
-['dragleave','drop'].forEach(t=>dz.addEventListener(t,e=>{ e.preventDefault(); dz.style.background='#f7f9ff'; }));
-dz.addEventListener('drop',e=>addFiles(e.dataTransfer.files));
 $('newProg').onclick=()=>{ S=blankProgram(); openDetail(); };
 $('backBtn').onclick=()=>{ showView('list'); renderHistory(); };
 $('previewBtn').onclick=renderPreview;

@@ -489,12 +489,13 @@ function renderHistory(){
   const sec=(title,arr,empty)=>{
     let h='<h3 style="margin:14px 0 6px;font-size:16px">'+title+' <span class="muted" style="font-weight:400">('+arr.length+')</span></h3>';
     if(!arr.length) return h+'<div class="muted" style="padding:4px 0 8px">'+empty+'</div>';
-    h+='<table style="width:100%;border-collapse:collapse"><tr><th>Number</th><th>Name</th><th style="width:150px">Status</th></tr>';
-    arr.forEach(e=>{ h+='<tr class="jobrow" data-id="'+esc(e.id)+'"><td class="num">'+esc(e.ref||'(no number)')+'</td><td>'+esc(e.name)+'</td><td>'+stSel(e)+'</td></tr>'; });
+    h+='<table style="width:100%;border-collapse:collapse"><tr><th>Number</th><th>Name</th><th style="width:120px">Quote file</th><th style="width:150px">Status</th></tr>';
+    arr.forEach(e=>{ h+='<tr class="jobrow" data-id="'+esc(e.id)+'"><td class="num">'+esc(e.ref||'(no number)')+'</td><td>'+esc(e.name)+'</td><td>'+((e.files&&e.files.length)?'<button class="ghost qf" data-id="'+esc(e.id)+'" style="padding:4px 10px">View'+(e.files.length>1?' ('+e.files.length+')':'')+'</button>':'<span class="muted">None</span>')+'</td><td>'+stSel(e)+'</td></tr>'; });
     return h+'</table>';
   };
   $('histTable').innerHTML=sec('Quotes',list.filter(e=>!isJob(e.status)),'No open quotes.')+sec('Jobs',list.filter(e=>isJob(e.status)),'No approved jobs yet. Change a quote status to Won to move it here.');
   $('histTable').querySelectorAll('tr.jobrow').forEach(tr=>tr.onclick=()=>openJob(tr.dataset.id));
+  $('histTable').querySelectorAll('button.qf').forEach(bt=>bt.onclick=ev=>{ ev.stopPropagation(); const e=HIST.find(x=>x.id===bt.dataset.id); if(e&&e.files&&e.files.length) previewFile(e.files[0]); });
   $('histTable').querySelectorAll('select.stsel').forEach(sl=>{ sl.onclick=ev=>ev.stopPropagation(); sl.onchange=ev=>{ ev.stopPropagation(); histUpdate(sl.dataset.id,{status:sl.value}); }; });
 }
 const EXTRAS={builder:'',pm:'',unitLabel:'units',glance:'',needs:'Access to each area when we need it, with ceilings left open until our work is in.\nSite access, lay down area, and temporary power and lighting.\nYour nominated program.',conds:'Start is on written approval of price and time.\nNormal working hours, no after hours work. Durations assume continuous access.\nOur crew is closed from 23 December to 5 January, and this is not counted in the working days.\nMaterial lead times may affect the start.',actualVp:null,actualDjb:null};
@@ -625,6 +626,7 @@ async function ghDelFile(path){
 }
 async function atBlob(f){
   if(f.local){ const b=await idbGet(f.path); if(!b) throw new Error('This file was saved in another browser'); return b; }
+  try{ const q=await fetch(f.path.split('/').map(encodeURIComponent).join('/'),{cache:'no-store'}); if(q.ok) return new Blob([await q.blob()],{type:fileType(f.name,f.type)}); }catch(x){}
   const tok=ghToken();
   const r=await fetch(ghFileUrl(f.path)+'?ref='+GH.branch,{headers:Object.assign({Accept:'application/vnd.github.raw'},tok?{Authorization:'Bearer '+tok}:{})});
   if(!r.ok) throw new Error('GitHub '+r.status);
@@ -633,8 +635,9 @@ async function atBlob(f){
 let attUrl='';
 function closeAtt(){ $('attModal').hidden=true; $('attBody').innerHTML=''; if(attUrl){ URL.revokeObjectURL(attUrl); attUrl=''; } }
 function saveBlob(blob,name){ const u=URL.createObjectURL(blob), a=document.createElement('a'); a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),4000); }
-async function previewAtt(i){
-  const f=(S.files||[])[i]; if(!f) return; $('attMsg').textContent='Opening '+f.name+'...';
+function previewAtt(i){ return previewFile((S.files||[])[i]); }
+async function previewFile(f){
+  if(!f) return; $('attMsg').textContent='Opening '+f.name+'...'; $('histNote').textContent='Opening '+f.name+'...';
   try{
     const blob=await atBlob(f); const t=fileType(f.name,f.type); attUrl=URL.createObjectURL(blob);
     $('attTitle').textContent=f.name; $('attDl').onclick=()=>saveBlob(blob,f.name);
@@ -642,8 +645,8 @@ async function previewAtt(i){
     if(t==='application/pdf'){ el=document.createElement('iframe'); el.src=attUrl; el.style.cssText='border:0;width:100%;height:100%'; }
     else if(t.indexOf('image/')===0){ el=document.createElement('img'); el.src=attUrl; el.style.cssText='max-width:100%;max-height:100%'; }
     else { el=document.createElement('div'); el.style.cssText='padding:30px;text-align:center'; el.textContent='No preview for this file type. Use Download to open it.'; }
-    $('attBody').appendChild(el); $('attModal').hidden=false; $('attMsg').textContent='';
-  }catch(e){ $('attMsg').textContent='Could not open the file: '+((e&&e.message)||'blocked'); }
+    $('attBody').appendChild(el); $('attModal').hidden=false; $('attMsg').textContent=''; $('histNote').textContent='';
+  }catch(e){ $('attMsg').textContent='Could not open the file: '+((e&&e.message)||'blocked'); $('histNote').textContent='Could not open the file: '+((e&&e.message)||'blocked'); }
 }
 function renderAttach(){
   const fs=S.files||[]; let h='';

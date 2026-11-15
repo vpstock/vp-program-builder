@@ -133,6 +133,11 @@ textarea.csv{height:140px;font-family:ui-monospace,Menlo,monospace;font-size:12p
 <div style="flex:1;min-width:260px"><label>Client summary: start and conditions (one point per line)</label><textarea id="conds" class="in" rows="5"></textarea></div>
 </div>
 <div class="row" style="margin-top:12px">
+<div style="width:230px"><label>Costing sheet hours, our crew</label><input id="cstVp" class="in" type="number" step="any"></div>
+<div style="width:230px"><label>Costing sheet hours, DJB</label><input id="cstDjb" class="in" type="number" step="any"></div>
+<div style="flex:1;min-width:260px" class="note" id="costNote">From the estimator's costing sheet. The builder program (weeks) is based on these hours. This internal program and the daily task sheet stay on the Estimating Guideline.</div>
+</div>
+<div class="row" style="margin-top:12px">
 <div style="width:200px"><label>Actual hours, our crew (when finished)</label><input id="actVp" class="in" type="number" step="any"></div>
 <div style="width:200px"><label>Actual hours, DJB (when finished)</label><input id="actDjb" class="in" type="number" step="any"></div>
 </div>
@@ -228,6 +233,18 @@ function build(){
     });
   }));
   return rows;
+}
+function buildCosted(){
+  const rows=build(), g={VP:0,DJB:0}; rows.forEach(r=>{ g[r.who]=(g[r.who]||0)+r.total; });
+  const c={VP:S.costVp,DJB:S.costDjb}, k={};
+  ['VP','DJB'].forEach(w=>{ k[w]=(c[w]!=null&&c[w]!==''&&+c[w]>=0&&g[w]>0)?(+c[w])/g[w]:1; });
+  return {rows:rows.map(r=>Object.assign({},r,{total:r.total*(k[r.who]||1)})),k,g};
+}
+function costNote(){
+  const n=$('costNote'); if(!n) return; const rows=build(), g={VP:0,DJB:0}; rows.forEach(r=>{ g[r.who]=(g[r.who]||0)+r.total; });
+  const f=x=>(Math.round(x*10)/10);
+  const has=(S.costVp!=null&&S.costVp!=='')||(S.costDjb!=null&&S.costDjb!=='');
+  n.textContent=has?('Estimating Guideline: our crew '+f(g.VP)+' h, DJB '+f(g.DJB)+' h. The builder program (weeks) is based on the costing sheet hours. This internal program and the daily task sheet stay on the Estimating Guideline.'):'From the estimator\'s costing sheet. Leave blank to base the builder program on the Estimating Guideline. This internal program and the daily task sheet always use the Estimating Guideline.';
 }
 function plan(rows){
   const cs=closureSet(), start0=parse(S.start);
@@ -494,7 +511,7 @@ function renderHistory(){
   $('histTable').querySelectorAll('button.qa').forEach(bt=>bt.onclick=ev=>{ ev.stopPropagation(); attTarget=bt.dataset.id; $('attInput').click(); });
   $('histTable').querySelectorAll('select.stsel').forEach(sl=>{ sl.onclick=ev=>ev.stopPropagation(); sl.onchange=ev=>{ ev.stopPropagation(); histUpdate(sl.dataset.id,{status:sl.value}); }; });
 }
-const EXTRAS={builder:'',pm:'',unitLabel:'units',glance:'',needs:'Access to each area when we need it, with ceilings left open until our work is in.\nSite access, lay down area, and temporary power and lighting.\nYour nominated program.',conds:'Start is on written approval of price and time.\nNormal working hours, no after hours work. Durations assume continuous access.\nWe are closed from 23 December to 5 January, and this is not counted in the weeks shown.\nMaterial lead times may affect the start.',actualVp:null,actualDjb:null};
+const EXTRAS={costVp:null,costDjb:null,builder:'',pm:'',unitLabel:'units',glance:'',needs:'Access to each area when we need it, with ceilings left open until our work is in.\nSite access, lay down area, and temporary power and lighting.\nYour nominated program.',conds:'Start is on written approval of price and time.\nNormal working hours, no after hours work. Durations assume continuous access.\nWe are closed from 23 December to 5 January, and this is not counted in the weeks shown.\nMaterial lead times may affect the start.',actualVp:null,actualDjb:null};
 function nextMonday(){ const d=new Date(); d.setDate(d.getDate()+((8-d.getDay())%7||7)); return iso(d); }
 function blankProgram(){
   return Object.assign({name:'',ref:'',start:nextMonday(),own:2,djb:1,hpd:7.6,diff:1,closures:DEFAULT.closures,status:'Quoted',notes:'',areas:[{id:'a'+Date.now(),name:'Area 1',units:1,job:false,lines:[]}]},JSON.parse(JSON.stringify(EXTRAS)));
@@ -509,7 +526,7 @@ function openJob(id){
 function openDetail(){ renderSettings(); renderAreas(); recalc(); $('detailTitle').textContent=(S.ref||'New program')+(S.name?'  '+S.name:''); $('saveMsg').textContent=''; $('delBtn').style.display=S.hid?'':'none'; showView('detail'); }
 function lines(s){ return String(s||'').split('\n').map(x=>x.trim()).filter(Boolean); }
 function renderPreview(){
-  const rows=build(), p=plan(rows);
+  const rows=buildCosted().rows, p=plan(rows);
   if(!p.tasks.length){ $('previewDoc').innerHTML='<div class="pvdoc">Add areas and lines first.</div>'; showView('preview'); return; }
   const fin=p.tasks.reduce((m,t)=>(!m||t.finish>m)?t.finish:m,null);
   const cols=[]; let x=firstWork(p.start0,p.cs); while(x<=fin){ cols.push(iso(x)); x=nextWork(x,p.cs); }
@@ -705,8 +722,10 @@ $('hq').oninput=renderHistory;
 $('copyHist').onclick=async()=>{ try{ await navigator.clipboard.writeText(histCsv()); $('histNote').textContent='History copied as CSV.'; }catch(e){ $('csv').value=histCsv(); $('csv').select(); $('histNote').textContent='Copy blocked here. The history CSV is in the box under Copy out, press Ctrl+C.'; } };
 $('status').onchange=e=>{ S.status=e.target.value; save(); if(S.hid) histUpdate(S.hid,{status:S.status}); };
 $('notes').oninput=e=>{ S.notes=e.target.value; save(); };
-function syncMeta(){ $('status').value=S.status||'Quoted'; $('notes').value=S.notes||''; $('glance').value=S.glance||''; $('needs').value=S.needs||''; $('conds').value=S.conds||''; $('actVp').value=S.actualVp==null?'':S.actualVp; $('actDjb').value=S.actualDjb==null?'':S.actualDjb; }
+function syncMeta(){ $('status').value=S.status||'Quoted'; $('notes').value=S.notes||''; $('glance').value=S.glance||''; $('needs').value=S.needs||''; $('conds').value=S.conds||''; $('actVp').value=S.actualVp==null?'':S.actualVp; $('actDjb').value=S.actualDjb==null?'':S.actualDjb; $('cstVp').value=S.costVp==null?'':S.costVp; $('cstDjb').value=S.costDjb==null?'':S.costDjb; costNote(); }
 ['glance','needs','conds'].forEach(k=>$(k).oninput=e=>{S[k]=e.target.value;save();});
+$('cstVp').oninput=e=>{S.costVp=e.target.value===''?null:+e.target.value;save();costNote();};
+$('cstDjb').oninput=e=>{S.costDjb=e.target.value===''?null:+e.target.value;save();costNote();};
 $('actVp').oninput=e=>{S.actualVp=e.target.value===''?null:+e.target.value;save();};
 $('actDjb').oninput=e=>{S.actualDjb=e.target.value===''?null:+e.target.value;save();};
 

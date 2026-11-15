@@ -184,7 +184,7 @@ textarea.csv{height:140px;font-family:ui-monospace,Menlo,monospace;font-size:12p
 <div id="attBody" style="flex:1;overflow:auto;background:#f7f8fa;display:flex;align-items:center;justify-content:center"></div>
 </div></div>
 <div id="tasksView" hidden>
-<div class="pvbar row" style="margin-bottom:12px"><button class="ghost" id="tkBack">Back to program</button><button id="tkPdf">Download PDF</button><span class="muted" id="tkMsg">Day by day task sheet for the site team. Internal, not for the builder.</span></div>
+<div class="pvbar row" style="margin-bottom:12px"><button class="ghost" id="tkBack">Back to program</button><label style="display:flex;gap:6px;align-items:center;margin:0;font-weight:600">Our crew <select id="tkCrew" class="in" style="width:auto;padding:6px 8px"><option value="2" selected>2 people</option><option value="3">3 people</option></select></label><button id="tkPdf">Download PDF</button><span class="muted" id="tkMsg">Day by day task sheet for the site team. Internal, not for the builder.</span></div>
 <div id="tasksDoc"></div>
 </div>
 <div id="previewView" hidden>
@@ -557,6 +557,10 @@ function renderPreview(){
 }
 const STAGE_ORDER=['Site setup','Demolition','Rough in','Fit off','Commissioning'];
 function renderTasks(){
+  const crewN=+$('tkCrew').value||2, oldOwn=S.own; S.own=crewN;
+  try{ renderTasksInner(crewN); } finally { S.own=oldOwn; }
+}
+function renderTasksInner(crewN){
   const rows=build(), p=plan(rows);
   if(!p.tasks.length){ $('tasksDoc').innerHTML='<div class="pvdoc">Add areas and lines first.</div>'; showView('tasks'); return; }
   const cs=p.cs, fin=p.tasks.reduce((m,t)=>(!m||t.finish>m)?t.finish:m,null);
@@ -597,13 +601,14 @@ function renderTasks(){
   }).join('');
   const dstr=new Date().toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'});
   $('tasksDoc').innerHTML='<div class="pvdoc"><div class="top"><div class="eb">Victorian Projects, mechanical services</div><h1>Daily task sheet</h1><p>'+esc(S.name)+'</p></div>'+
-   '<div class="meta"><div><span>Reference</span><b>'+esc(S.ref)+'</b></div><div><span>On site from</span><b>'+esc(dl(days[0]))+'</b></div><div><span>Finish</span><b>'+esc(dl(fin))+'</b></div><div><span>Working days</span><b>'+days.length+'</b></div></div>'+
+   '<div class="meta"><div><span>Reference</span><b>'+esc(S.ref)+'</b></div><div><span>On site from</span><b>'+esc(dl(days[0]))+'</b></div><div><span>Finish</span><b>'+esc(dl(fin))+'</b></div><div><span>Our crew</span><b>'+crewN+' people</b></div><div><span>Working days</span><b>'+days.length+'</b></div></div>'+
    '<div class="note muted" style="margin:8px 0">Internal sheet for our site team only, not for the builder. Each day is a full day of work for our crew, taken from the Estimating Guideline ('+units+' '+esc(S.unitLabel||'units')+'). Days with no tasks for our crew are left out. Tick each item off as it is done, and tell the PM the same day if a day is falling behind. Printed '+esc(dstr)+'.</div>'+
    boxes+
    '<div class="foot">Victorian Projects, Unit 2, 9 Industry Boulevard, Carrum Downs VIC 3201 &nbsp;|&nbsp; (03) 9798 7780</div></div>';
   showView('tasks');
 }
-$('tasksBtn').onclick=renderTasks;
+$('tasksBtn').onclick=()=>{ $('tkCrew').value='2'; renderTasks(); };
+$('tkCrew').onchange=renderTasks;
 $('tkBack').onclick=()=>showView('detail');
 $('tkPdf').onclick=async()=>{
   const btn=$('tkPdf'), msg=$('tkMsg'), el=document.querySelector('#tasksDoc .pvdoc'); if(!el) return;

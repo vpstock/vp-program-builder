@@ -118,6 +118,7 @@ textarea.csv{height:140px;font-family:ui-monospace,Menlo,monospace;font-size:12p
 </section></div>
 <div id="detailView" hidden>
 <div class="row" style="margin-bottom:12px;align-items:center"><button class="ghost" id="backBtn">Back to list</button><h2 id="detailTitle" style="flex:1;margin:0 8px"></h2><button class="ghost" id="tasksBtn">Preview for daily tasks</button><button id="previewBtn">Preview for builder</button><button class="danger" id="delBtn">Delete</button></div>
+<div class="row" id="dtAtt" style="margin-bottom:12px;align-items:center;gap:8px;flex-wrap:wrap"><button class="ghost" id="addQuoteBtn">+ Quote</button><button class="ghost" id="addCostBtn">+ Costing sheet</button><span id="dtFiles" class="row" style="gap:6px;flex-wrap:wrap"></span></div>
 <div class="tiles" id="hTiles"></div>
 
 <section class="card">
@@ -523,7 +524,7 @@ function openJob(id){
   S=Object.assign(JSON.parse(JSON.stringify(EXTRAS)),st); S.hid=id; S.status=e.status; S.notes=e.notes; S.actualVp=e.actualVp; S.actualDjb=e.actualDjb;
   openDetail();
 }
-function openDetail(){ renderSettings(); renderAreas(); recalc(); $('detailTitle').textContent=(S.ref||'New program')+(S.name?'  '+S.name:''); $('saveMsg').textContent=''; $('delBtn').style.display=S.hid?'':'none'; showView('detail'); }
+function openDetail(){ renderSettings(); renderAreas(); recalc(); $('detailTitle').textContent=(S.ref||'New program')+(S.name?'  '+S.name:''); $('saveMsg').textContent=''; $('delBtn').style.display=S.hid?'':'none'; renderDtFiles(); showView('detail'); }
 function lines(s){ return String(s||'').split('\n').map(x=>x.trim()).filter(Boolean); }
 function renderPreview(){
   const rows=buildCosted().rows, p=plan(rows);
@@ -625,7 +626,7 @@ $('tkPdf').onclick=async()=>{
 };
 
 const AT_MAX=25*1024*1024;
-function fileLabel(f,i,n){ if(n<2) return 'View'; if(/costing|register/i.test(f.name)) return 'Costing sheet'; if(/\.pdf$/i.test(f.name)) return 'Quote'; return 'File '+(i+1); }
+function fileLabel(f,i,n){ if(f.kind==='quote') return 'Quote'; if(f.kind==='costing') return 'Costing sheet'; if(n<2) return 'View'; if(/costing|register/i.test(f.name)) return 'Costing sheet'; if(/\.pdf$/i.test(f.name)) return 'Quote'; return 'File '+(i+1); }
 function safeName(n){ return String(n).replace(/[^A-Za-z0-9._-]+/g,'-').replace(/^-+|-+$/g,'')||'file'; }
 function fmtSize(b){ return b>1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB'; }
 function fileType(n,t){ if(t) return t; const e=(n.split('.').pop()||'').toLowerCase(); return ({pdf:'application/pdf',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',webp:'image/webp'})[e]||'application/octet-stream'; }
@@ -733,8 +734,8 @@ async function previewFile(f,id,idx){
     $('attBody').appendChild(el); $('attModal').hidden=false; $('histNote').textContent='';
   }catch(e){ $('histNote').textContent='Could not open the file: '+((e&&e.message)||'blocked'); }
 }
-function attNote(t){ $('histNote').textContent=t; }
-async function addFilesTo(id,list){
+function attNote(t){ $('histNote').textContent=t; if(!$('detailView').hidden) $('saveMsg').textContent=t; }
+async function addFilesTo(id,list,kind){
   const files=Array.from(list||[]); const e=HIST.find(x=>x.id===id); if(!files.length||!e) return;
   let fs=(e.files||[]).slice(), done=0;
   for(const file of files){
@@ -743,7 +744,7 @@ async function addFilesTo(id,list){
     const path='attachments/'+id+'/'+Date.now().toString(36)+'-'+safeName(file.name), local=hmode!=='github';
     try{
       if(local) await idbPut(path,file); else await ghPutFile(path,file);
-      fs.push({name:file.name,path,size:file.size,type:fileType(file.name,file.type),added:new Date().toISOString(),local});
+      fs.push({name:file.name,path,size:file.size,type:fileType(file.name,file.type),added:new Date().toISOString(),local,kind:kind||undefined});
       await histUpdate(id,{files:fs}); done++;
     }catch(x){ attNote('Could not upload '+file.name+': '+((x&&x.message)||'blocked')); return; }
   }
@@ -755,7 +756,19 @@ async function removeFileFrom(id,i){
   catch(x){ attNote('Could not remove: '+((x&&x.message)||'blocked')); }
 }
 let attTarget='';
-$('attInput').onchange=e=>{ addFilesTo(attTarget,e.target.files); e.target.value=''; };
+let attKind='';
+$('attInput').onchange=async e=>{
+  const list=Array.from(e.target.files); e.target.value=''; let id=attTarget, k=attKind; attKind='';
+  if(id==='__cur'){ if(!S.hid) await saveHist(false); id=S.hid; if(!id){ $('saveMsg').textContent+=' Could not attach, save failed.'; return; } }
+  await addFilesTo(id,list,k); if(attTarget==='__cur') renderDtFiles();
+};
+function renderDtFiles(){
+  const box=$('dtFiles'); if(!box) return; box.innerHTML='';
+  const e=S.hid&&HIST.find(h=>h.id===S.hid); const fs=(e&&e.files)||[];
+  fs.forEach((f,i)=>{ const b=document.createElement('button'); b.className='ghost'; b.textContent=fileLabel(f,i,fs.length)+': '+f.name; b.title='Preview '+f.name; b.style.maxWidth='260px'; b.style.overflow='hidden'; b.style.textOverflow='ellipsis'; b.style.whiteSpace='nowrap'; b.onclick=()=>previewFile(f,S.hid,i); box.appendChild(b); });
+}
+$('addQuoteBtn').onclick=()=>{ attTarget='__cur'; attKind='quote'; $('attInput').click(); };
+$('addCostBtn').onclick=()=>{ attTarget='__cur'; attKind='costing'; $('attInput').click(); };
 $('attClose').onclick=closeAtt;
 $('attModal').onclick=e=>{ if(e.target===$('attModal')) closeAtt(); };
 $('newProg').onclick=()=>{ S=blankProgram(); openDetail(); };

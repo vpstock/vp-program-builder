@@ -629,7 +629,7 @@ $('tkPdf').onclick=async()=>{
 };
 
 const AT_MAX=25*1024*1024;
-function fileLabel(f,i,n){ if(f.kind==='wsd') return 'WSD'; if(f.kind==='quote') return 'Quote'; if(f.kind==='costing') return 'Costing sheet'; if(n<2) return 'View'; if(/costing|register/i.test(f.name)) return 'Costing sheet'; if(/\.pdf$/i.test(f.name)) return 'Quote'; return 'File '+(i+1); }
+function fileLabel(f,i,n){ if(f.kind==='wsd') return 'WSD'; if(f.kind==='quote') return 'Quote'; if(f.kind==='costing') return 'Costing sheet'; if(/\.zip$/i.test(f.name)) return 'Zip file'; if(n<2) return 'View'; if(/costing|register/i.test(f.name)) return 'Costing sheet'; if(/\.pdf$/i.test(f.name)) return 'Quote'; return 'File '+(i+1); }
 function safeName(n){ return String(n).replace(/[^A-Za-z0-9._-]+/g,'-').replace(/^-+|-+$/g,'')||'file'; }
 function fmtSize(b){ return b>1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB'; }
 function fileType(n,t){ if(t) return t; const e=(n.split('.').pop()||'').toLowerCase(); return ({pdf:'application/pdf',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',webp:'image/webp'})[e]||'application/octet-stream'; }
@@ -742,6 +742,7 @@ async function addFilesTo(id,list,kind){
   const files=Array.from(list||[]); const e=HIST.find(x=>x.id===id); if(!files.length||!e) return;
   let fs=(e.files||[]).slice(), done=0;
   for(const file of files){
+    if(/\.zip$/i.test(file.name)){ attNote(file.name+' is a zip, which cannot be previewed. Unzip it and attach the quote PDF, costing sheet and WSD one by one.'); continue; }
     if(file.size>AT_MAX){ attNote(file.name+' is over 25 MB, so it was skipped.'); continue; }
     attNote('Uploading '+file.name+'...');
     const path='attachments/'+id+'/'+Date.now().toString(36)+'-'+safeName(file.name), local=hmode!=='github';

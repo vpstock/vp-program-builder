@@ -937,10 +937,27 @@ async function applyReadFiles(q,c,w){
 }
 $('newProg').onclick=()=>{ $('nqQuote').value=''; $('nqCost').value=''; $('nqWsd').value=''; $('nqMsg').textContent=''; $('nqModal').hidden=false; };
 $('nqCancel').onclick=()=>{ $('nqModal').hidden=true; };
+function loadJsZip(){ return window.JSZip?Promise.resolve():loadScriptFrom(libUrls('jszip.min.js','https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js')).catch(()=>{ throw new Error('Zip reader did not load'); }); }
+async function sortZip(list){
+  await loadJsZip(); const pool=[];
+  for(const f of list){ if(!f) continue;
+    if(/\.zip$/i.test(f.name)){ const z=await JSZip.loadAsync(await f.arrayBuffer());
+      for(const n of Object.keys(z.files)){ const e=z.files[n]; const base=n.split('/').pop(); if(e.dir||!base||base.startsWith('~$')||base.startsWith('.')||n.indexOf('__MACOSX')>=0) continue;
+        if(!/\.(pdf|xlsx|xlsm|xls)$/i.test(base)) continue;
+        pool.push(new File([await e.async('blob')],base)); }
+    } else pool.push(f); }
+  const r={q:null,c:null,w:null};
+  for(const f of pool){ if(/\.(xlsx|xlsm|xls)$/i.test(f.name)){ if(!r.c) r.c=f; } else if(/wsd/i.test(f.name)){ if(!r.w) r.w=f; } else if(!r.q) r.q=f; }
+  return r;
+}
 async function nqGo(skip){
-  const q=skip?null:$('nqQuote').files[0], c=skip?null:$('nqCost').files[0], w=skip?null:$('nqWsd').files[0];
+  let q=skip?null:$('nqQuote').files[0], c=skip?null:$('nqCost').files[0], w=skip?null:$('nqWsd').files[0];
   $('nqGo').disabled=true; $('nqSkip').disabled=true; $('nqModal').hidden=true;
   S=blankProgram(); openDetail();
+  if([q,c,w].some(f=>f&&/\.zip$/i.test(f.name))){
+    $('saveMsg').textContent='Opening the zip...';
+    try{ const r=await sortZip([q,c,w]); q=r.q; c=r.c; w=r.w; }catch(e){ $('saveMsg').textContent='Could not open the zip: '+((e&&e.message)||'error'); }
+  }
   if(q||c||w){
     $('saveMsg').textContent='Reading the files...';
     let rep=''; try{ rep=await applyReadFiles(q,c,w); }catch(e){ rep='Could not read the files: '+((e&&e.message)||'error'); } window.__rep=rep;

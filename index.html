@@ -807,6 +807,19 @@ function parseQuoteText(L){
     r.needs=bl.filter(x=>!/waste bins|protection of our/i.test(x)).map(x=>/[.!?]$/.test(x)?x:x+'.').join('\n');
   }
   r.glance=g(/(Priced on [^.]+\.)/,TJ);
+  // start and conditions from the quote's own program, procurement and after-hours sections
+  { const junk=/Ordish|Telephone|Victoria 3175|admin@|ABN |Licence No/i, dot=x=>/[.!?]$/.test(x)?x:x+'.', cond=[];
+    const sec=(a,b)=>{ const i=L.findIndex(l=>a.test(l)); if(i<0) return []; const o=[]; for(let k=i+1;k<L.length;k++){ if(b.test(L[k])) break; if(!junk.test(L[k])) o.push(L[k]); } return o; };
+    const pr=sec(/^\d+\.\s+PROGRAM\s*&\s*TIMEFRAME/i,/^\d+\.\s+[A-Z][A-Z &\/-]{5,}/), ah=sec(/^\d+\.\s+AFTER-?HOURS/i,/^\d+\.\s+[A-Z][A-Z &\/-]{5,}/);
+    const st=(pr.join(' ').match(/Estimated commencement:\s*(.+?)\s*(?:Estimated duration|$)/i)||[])[1];
+    if(st) cond.push('Start date: '+dot(st.charAt(0).toLowerCase()+st.slice(1)).replace(/^start date: /,'Start date is '));
+    const ci=pr.findIndex(l=>/Critical procurement/i.test(l));
+    if(ci>=0){ const b=[]; for(let k=ci+1;k<pr.length;k++){ if(/^[•·-]\s*/.test(pr[k])) b.push(pr[k].replace(/^[•·-]\s*/,'')); else if(b.length) b[b.length-1]+=' '+pr[k]; } b.forEach(x=>cond.push('Lead time: '+dot(x))); }
+    const ahT=ah.join(' ');
+    if(/lump sum includes[^.]*out of hours/i.test(ahT)) cond.push('Out of hours noisy works, penetrations and testing are included in the price, coordinated with the builder and base building.');
+    else if(pr.length||ah.length) cond.push('Normal working hours, no after hours work.');
+    if(cond.length){ cond.push('Durations assume continuous access.','We are closed from 23 December to 5 January, and this is not counted in the weeks shown.'); r.conds=cond.join('\n'); }
+  }
   // scope to guideline rows
   const pu=lv.length>0, hc=/hot and cold/i.test(TJ), tk=pu&&/take-?offs?/i.test(TJ), dp=pu&&/motori[sz]ed[^.]{0,40}damper/i.test(TJ), rc=pu&&/room controller/i.test(TJ), ck=/new 240\s*V|240\s*V circuit/i.test(TJ), bal=/balanc/i.test(TJ);
   const U=[], F=[];
@@ -899,7 +912,7 @@ async function applyReadFiles(q,c,w){
   const msg=[], chk=[], cost={};
   if(q){ try{
     const r=parseQuoteText(await readPdfLines(q)); window.__rev=r.rev;
-    ['ref','name','builder','pm','notes','glance','needs'].forEach(k=>{ if(r[k]) S[k]=r[k]; });
+    ['ref','name','builder','pm','notes','glance','needs','conds'].forEach(k=>{ if(r[k]) S[k]=r[k]; });
     if(r.unitLabel) S.unitLabel=r.unitLabel;
     const areas=[{id:'a'+Date.now()+'j',name:'Job level',units:1,job:true,lines:[{lib:'Air Conditioning Installation|67',mode:'fixed',qty:1}].concat(r.balance?[{lib:'Duct Installation|10',mode:'fixed',qty:1}]:[])}];
     const lv=r.levels.length?r.levels:[{name:r.areaName||'Area 1',units:1}];

@@ -766,6 +766,91 @@ $('attInput').onchange=async e=>{
 };
 $('attClose').onclick=closeAtt;
 $('attModal').onclick=e=>{ if(e.target===$('attModal')) closeAtt(); };
+
+// ---- Quote and costing sheet reader (runs when a new quote is created with files)
+async function readPdfLines(file){
+  await (window.pdfjsLib?Promise.resolve():loadScriptFrom(libUrls('pdf.min.js','https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js')));
+  pdfjsLib.GlobalWorkerOptions.workerSrc=new URL('vendor/pdf.worker.min.js',location.href).href;
+  const doc=await pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise, out=[];
+  for(let p=1;p<=doc.numPages;p++){
+    const tc=await (await doc.getPage(p)).getTextContent(), rows=[];
+    tc.items.forEach(it=>{ if(!it.str.trim()) return; const y=Math.round(it.transform[5]), x=it.transform[4]; let r=rows.find(r=>Math.abs(r.y-y)<=2); if(!r){ r={y,items:[]}; rows.push(r); } r.items.push({x,s:it.str,w:it.width}); });
+    rows.sort((a,b)=>b.y-a.y).forEach(r=>{
+      r.items.sort((a,b)=>a.x-b.x); let s='', end=null;
+      r.items.forEach(i=>{ if(end!==null){ if(i.x-end>30) s+='   '; else if(i.x-end>1) s+=' '; } s+=i.s; end=i.x+i.w; });
+      s=s.trim(); if(s && !/^Page \d+ of \d+/i.test(s) && !/PROJECT REFERENCE/.test(s) && !/^Victorian Projects\s{2,}/.test(s) && !/^MECHANICAL SERVICES/.test(s)) out.push(s);
+    });
+  }
+  return out;
+}
+function parseQuoteText(L){
+  const T=L.join('\n'), TJ=L.join(' '), g=(re,src)=>{ const m=(src||T).match(re); return m?m[1].trim():''; }, r={found:[],check:[]};
+  r.ref=g(/Proposal Reference:\s*([A-Z0-9][\w-]*)/)||g(/Project Reference:\s*([A-Z0-9][\w-]*)/)||((T.match(/\b[A-Z]{2,4}-\d{3,5}-?[A-Z]?\b/)||[''])[0]);
+  let nm=g(/^Project:\s*(.+)$/m), par=nm.match(/\s*\(([^)]*)\)\s*$/); if(par){ nm=nm.replace(par[0],''); r.notes=par[1].charAt(0).toUpperCase()+par[1].slice(1); }
+  r.name=nm;
+  const b=g(/^Builder:\s*(.+)$/m); if(b){ const pr=b.replace(/\s*\([^)]*\)/g,'').split(/,?\s*attention\s+/i); r.builder=pr[1]?pr[1].trim()+', '+pr[0].trim():pr[0].trim(); if(r.notes) r.notes+=', '+pr[0].trim()+'.'; }
+  r.pm=g(/Assigned Project Manager:\s*(.+)$/m)||g(/Project Manager:\s*([A-Z][a-z]+ [A-Z][a-z]+)/);
+  // levels and counts
+  const lv=[], seen={}; let unitWord='';
+  L.forEach(l=>{ const m=l.match(/Level\s+(\w+)\b[^()\n]*\((\d+)\s+([A-Za-z]+?)s?\)/i); if(m&&!seen[m[1]]){ seen[m[1]]=1; lv.push({name:'Level '+m[1],units:+m[2]}); unitWord=unitWord||m[3].toLowerCase(); } });
+  if(lv.length&&lv.every(l=>/^Level \d+$/.test(l.name))) lv.sort((a,b)=>parseInt(a.name.slice(6))-parseInt(b.name.slice(6)));
+  r.levels=lv; r.unitLabel=unitWord?unitWord+'s':'';
+  // needs from builder responsibilities
+  const si=L.findIndex(l=>/BUILDER RESPONSIBILITIES/i.test(l)); if(si>=0){
+    const bl=[]; for(let i=si+1;i<L.length;i++){ if(/PROJECT DELIVERY|^\d+\.\s+[A-Z][A-Z &/]{5,}/.test(L[i])) break; if(/^[•·-]\s*/.test(L[i])) bl.push(L[i].replace(/^[•·-]\s*/,'')); else if(bl.length&&!/^The following/i.test(L[i])) bl[bl.length-1]+=' '+L[i]; }
+    r.needs=bl.filter(x=>!/waste bins|protection of our/i.test(x)).map(x=>/[.!?]$/.test(x)?x:x+'.').join('\n');
+  }
+  r.glance=g(/(Priced on [^.]+\.)/,TJ);
+  // scope to guideline rows
+  const hc=/hot and cold/i.test(TJ), tk=/take-?offs?/i.test(TJ), dp=/motori[sz]ed[^.]{0,40}damper/i.test(TJ), rc=/room controller|wall controller/i.test(TJ), ck=/new 240\s*V|240\s*V circuit/i.test(TJ), bal=/balanc/i.test(TJ);
+  const U=[], F=[];
+  if(tk){ U.push(['Duct Installation|8',hc?2:1]); r.found.push('takeoffs'); }
+  if(dp){ U.push(['Electrical Installation|30',hc?2:1]); r.found.push('motorised dampers'); }
+  if(rc){ U.push(['Electrical Installation|21',1]); r.found.push('room controllers'); }
+  if(ck){ ['11','68','65','74'].forEach(n=>F.push(['Electrical Installation|'+n,1])); r.found.push('floor circuit'); }
+  const BL=(bal&&(tk||dp)); if(BL) r.found.push('balancing');
+  r.unitLines=U; r.fixedLines=F; r.balance=bal; r.balLine=BL;
+  r.headings=L.filter(l=>/^4\.\d+\s/.test(l)).map(l=>l.replace(/^4\.\d+\s+/,''));
+  return r;
+}
+async function readCostingHours(file){
+  await loadExcelJs();
+  const wb=new ExcelJS.Workbook(); await wb.xlsx.load(await file.arrayBuffer()); let vp=null, djb=null;
+  const val=c=>{ let v=c&&c.value; if(v&&typeof v==='object'&&'result' in v) v=v.result; return (typeof v==='number')?v:(v!=null&&v!==''&&!isNaN(+v)?+v:null); };
+  const txt=c=>{ let v=c&&c.value; if(v&&typeof v==='object') v=v.result!=null?v.result:(v.richText?v.richText.map(t=>t.text).join(''):''); return String(v==null?'':v).trim(); };
+  wb.eachSheet(ws=>ws.eachRow(row=>{
+    const a=txt(row.getCell(1)), m=txt(row.getCell(2)).toLowerCase(); if(m!=='hours') return;
+    let v=null; row.eachCell(c=>{ if(c.col>2){ const n=val(c); if(n!==null) v=n; } }); if(v===null) return;
+    if(/^labour subtotal/i.test(a)) vp=Math.round(v*100)/100; else if(/electrical subcontract|djb/i.test(a)) djb=Math.round(v*100)/100;
+  }));
+  return {vp,djb};
+}
+async function applyReadFiles(q,c){
+  const msg=[], chk=[];
+  if(q){ try{
+    const r=parseQuoteText(await readPdfLines(q));
+    ['ref','name','builder','pm','notes','glance','needs'].forEach(k=>{ if(r[k]) S[k]=r[k]; });
+    if(r.unitLabel) S.unitLabel=r.unitLabel;
+    const areas=[{id:'a'+Date.now()+'j',name:'Job level',units:1,job:true,lines:[{lib:'Air Conditioning Installation|67',mode:'fixed',qty:1}].concat(r.balLine?[{lib:'Duct Installation|10',mode:'fixed',qty:1}]:[])}];
+    const lv=r.levels.length?r.levels:[{name:'Area 1',units:1}];
+    lv.forEach((l,i)=>areas.push({id:'a'+Date.now()+'x'+i,name:l.name,units:l.units,job:false,lines:r.unitLines.map(([id,n])=>({lib:id,mode:'unit',qty:n})).concat(r.fixedLines.map(([id,n])=>({lib:id,mode:'fixed',qty:n})),r.balLine?[{lib:'Duct Installation|9',mode:'unit',qty:1}]:[])}));
+    S.areas=areas;
+    msg.push('Quote read: '+(r.ref||'no number found')+', '+r.levels.length+' level'+(r.levels.length===1?'':'s')+(r.levels.length?' ('+r.levels.reduce((a,l)=>a+l.units,0)+' '+(r.unitLabel||'units')+')':'')+'.');
+    if(!r.unitLines.length&&!r.fixedLines.length&&!r.balLine) chk.push('no scope items matched the guideline, so please add the items to each area yourself');
+    else msg.push('Items matched: '+r.found.join(', ')+'.');
+    if(!r.levels.length) chk.push('no levels with counts found, so one area was made');
+    if(!r.ref) chk.push('quote number not found');
+    chk.push('check the quantities against the quote scope');
+  }catch(e){ chk.push('could not read the quote PDF ('+((e&&e.message)||'error')+')'); } }
+  if(c){ try{
+    const h=await readCostingHours(c);
+    if(h.vp!=null) S.costVp=h.vp; if(h.djb!=null) S.costDjb=h.djb;
+    if(h.vp!=null||h.djb!=null) msg.push('Costing hours read: our crew '+(h.vp!=null?h.vp:'?')+' h, DJB '+(h.djb!=null?h.djb:'?')+' h.');
+    else chk.push('no labour hours found in the costing sheet, so enter them under Costing sheet hours');
+  }catch(e){ chk.push('could not read the costing sheet ('+((e&&e.message)||'error')+')'); } }
+  renderSettings(); renderAreas(); recalc(); $('detailTitle').textContent=(S.ref||'New program')+(S.name?'  '+S.name:'');
+  return msg.join(' ')+(chk.length?' To check: '+chk.join('; ')+'.':'');
+}
 $('newProg').onclick=()=>{ $('nqQuote').value=''; $('nqCost').value=''; $('nqMsg').textContent=''; $('nqModal').hidden=false; };
 $('nqCancel').onclick=()=>{ $('nqModal').hidden=true; };
 async function nqGo(skip){
@@ -773,11 +858,14 @@ async function nqGo(skip){
   $('nqGo').disabled=true; $('nqSkip').disabled=true;
   S=blankProgram(); openDetail();
   if(q||c){
-    $('nqMsg').textContent='Attaching files...';
+    $('nqMsg').textContent='Reading the files...';
+    let rep=''; try{ rep=await applyReadFiles(q,c); }catch(e){ rep='Could not read the files: '+((e&&e.message)||'error'); } window.__rep=rep;
+    $('nqMsg').textContent='Saving...';
     await saveHist(false);
     if(S.hid){ if(q) await addFilesTo(S.hid,[q],'quote'); if(c) await addFilesTo(S.hid,[c],'costing'); }
   }
   $('nqModal').hidden=true; $('nqGo').disabled=false; $('nqSkip').disabled=false;
+  if(q||c) $('saveMsg').textContent=(window.__rep||'')+' '+$('saveMsg').textContent;
 }
 $('nqGo').onclick=()=>nqGo(false); $('nqSkip').onclick=()=>nqGo(true);
 $('backBtn').onclick=()=>{ showView('list'); renderHistory(); };

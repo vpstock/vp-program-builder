@@ -789,6 +789,10 @@ function parseQuoteText(L){
   let nm=g(/^Project:\s*(.+)$/m), par=nm.match(/\s*\(([^)]*)\)\s*$/); if(par){ nm=nm.replace(par[0],''); r.notes=par[1].charAt(0).toUpperCase()+par[1].slice(1); }
   r.name=nm;
   const b=g(/^Builder:\s*(.+)$/m); if(b){ const pr=b.replace(/\s*\([^)]*\)/g,'').split(/,?\s*attention\s+/i); r.builder=pr[1]?pr[1].trim()+', '+pr[0].trim():pr[0].trim(); if(r.notes) r.notes+=', '+pr[0].trim()+'.'; }
+  { const i=L.findIndex(l=>/Quotation Prepared For:/i.test(l)); if(i>=0&&L[i+1]){ const parts=L[i+1].split(/\s{3,}/), nm2=parts[parts.length-1].trim(); if(/^[A-Z][A-Za-z'.-]+( [A-Z][A-Za-z'.-]+)+(,.*)?$/.test(nm2)&&!/\d/.test(nm2)) r.attn=nm2; } }
+  if(r.attn&&!/,/.test(r.attn)){ const co=g(/^Builder:\s*(.+)$/m).replace(/\s*\([^)]*\)/g,'').split(/,?\s*attention\s+/i)[0].trim(); r.builder=co?r.attn+', '+co:r.attn; } else if(r.attn) r.builder=r.attn;
+  r.address=g(/^Project Address:\s*(.+)$/m);
+  { const rm=T.match(/^Revision:\s*(\d+)/m); r.rev=rm?+rm[1]:null; }
   r.pm=g(/Assigned Project Manager:\s*(.+)$/m)||g(/Project Manager:\s*([A-Z][a-z]+ [A-Z][a-z]+)/);
   // levels and counts
   const lv=[], seen={}; let unitWord='';
@@ -802,50 +806,73 @@ function parseQuoteText(L){
   }
   r.glance=g(/(Priced on [^.]+\.)/,TJ);
   // scope to guideline rows
-  const hc=/hot and cold/i.test(TJ), tk=/take-?offs?/i.test(TJ), dp=/motori[sz]ed[^.]{0,40}damper/i.test(TJ), rc=/room controller|wall controller/i.test(TJ), ck=/new 240\s*V|240\s*V circuit/i.test(TJ), bal=/balanc/i.test(TJ);
+  const pu=lv.length>0, hc=/hot and cold/i.test(TJ), tk=pu&&/take-?offs?/i.test(TJ), dp=pu&&/motori[sz]ed[^.]{0,40}damper/i.test(TJ), rc=pu&&/room controller/i.test(TJ), ck=/new 240\s*V|240\s*V circuit/i.test(TJ), bal=/balanc/i.test(TJ);
   const U=[], F=[];
   if(tk){ U.push(['Duct Installation|8',hc?2:1]); r.found.push('takeoffs'); }
   if(dp){ U.push(['Electrical Installation|30',hc?2:1]); r.found.push('motorised dampers'); }
   if(rc){ U.push(['Electrical Installation|21',1]); r.found.push('room controllers'); }
   if(ck){ ['11','68','65','74'].forEach(n=>F.push(['Electrical Installation|'+n,1])); r.found.push('floor circuit'); }
-  const BL=(bal&&(tk||dp)); if(BL) r.found.push('balancing');
+  const BL=(bal&&(tk||dp)); if(BL) r.found.push('balancing'); if(bal&&!BL) r.found.push('balancing set-up');
+  const NW={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12}, cnt=re=>{ const m=TJ.match(re); if(!m) return 0; const w=m[1].toLowerCase(); return NW[w]||(+w)||0; };
+  const nW='(one|two|three|four|five|six|seven|eight|nine|ten|\\d+)';
+  const fcu=cnt(new RegExp(nW+'\\s+(?:high static\\s+)?(?:ducted\\s+)?(?:indoor\\s+)?fan coil units?','i')), bj=cnt(new RegExp(nW+'\\s+[A-Z0-9-]+\\s+branch (?:joints?|boxes?)','i')), wc=cnt(new RegExp(nW+'\\s+[A-Z0-9-]+\\s+wired (?:wall )?controllers?','i')), oaf=cnt(new RegExp('(?:supply|install)[^.]{0,40}?'+nW+'\\s+outside air supply fans?','i'))||(/outside air supply fan/i.test(TJ)?1:0);
+  if(fcu){ F.push(['Air Conditioning Installation|11',fcu],['Air Conditioning Installation|34',fcu],['Air Conditioning Installation|53',fcu],['Duct Installation|3',fcu]); r.found.push(fcu+' indoor fan coil units'); }
+  if(bj){ F.push(['Air Conditioning Installation|13',bj]); r.found.push(bj+' branch joints'); }
+  if(wc&&!rc){ F.push(['Electrical Installation|21',wc,'VP']); r.found.push(wc+' wired controllers'); }
+  if(oaf){ F.push(['Fans|2',oaf]); r.found.push(oaf+' outside air fan'); }
+  if(fcu&&/motori[sz]ed dampers? to the outside air fan/i.test(TJ)){ F.push(['Electrical Installation|30',1,'VP']); r.found.push('outside air fan damper'); }
+  if(!r.levels.length){ const am=(r.address||'').match(/Levels?\s+(\d+)\s*(?:&|and)\s*(\d+)/i); r.areaName=am?'Levels '+am[1]+' and '+am[2]:(r.address?r.address.split(',')[0]:'Whole job'); }
   r.unitLines=U; r.fixedLines=F; r.balance=bal; r.balLine=BL;
   r.headings=L.filter(l=>/^4\.\d+\s/.test(l)).map(l=>l.replace(/^4\.\d+\s+/,''));
   return r;
 }
-async function readCostingHours(file){
+async function readCostingHours(file,rev){
   await loadExcelJs();
-  const wb=new ExcelJS.Workbook(); await wb.xlsx.load(await file.arrayBuffer()); let vp=null, djb=null;
+  const wb=new ExcelJS.Workbook(); await wb.xlsx.load(await file.arrayBuffer()); let vp=null, djb=null, from='';
   const val=c=>{ let v=c&&c.value; if(v&&typeof v==='object'&&'result' in v) v=v.result; return (typeof v==='number')?v:(v!=null&&v!==''&&!isNaN(+v)?+v:null); };
   const txt=c=>{ let v=c&&c.value; if(v&&typeof v==='object') v=v.result!=null?v.result:(v.richText?v.richText.map(t=>t.text).join(''):''); return String(v==null?'':v).trim(); };
+  // Format 1: Quote Revision Register (Labour subtotal and DJB rows)
   wb.eachSheet(ws=>ws.eachRow(row=>{
     const a=txt(row.getCell(1)), m=txt(row.getCell(2)).toLowerCase(); if(m!=='hours') return;
     let v=null; row.eachCell(c=>{ if(c.col>2){ const n=val(c); if(n!==null) v=n; } }); if(v===null) return;
     if(/^labour subtotal/i.test(a)) vp=Math.round(v*100)/100; else if(/electrical subcontract|djb/i.test(a)) djb=Math.round(v*100)/100;
   }));
-  return {vp,djb};
+  if(vp!==null||djb!==null) return {vp,djb,from:'Quote Revision Register'};
+  // Format 2: estimator costing sheet with QUOTE 1 / REV1 ... sheets and a Total Budget Hours row
+  const vis=wb.worksheets.filter(w=>w.state!=='hidden'), score=w=>{ const m=w.name.match(/^REV\s*(\d+)$/i); return m?+m[1]:(/^QUOTE\s*\d+$/i.test(w.name)?0:-1); };
+  let cand=vis.filter(w=>score(w)>=0);
+  let ws=(rev!=null&&cand.find(w=>/^REV/i.test(w.name)&&score(w)===+rev))||(rev===0&&cand.find(w=>/^QUOTE/i.test(w.name)))||cand.sort((a,b)=>score(b)-score(a))[0];
+  if(!ws) return {vp:null,djb:null,from:''};
+  let tot=null, sub=0;
+  ws.eachRow(row=>{ const first=txt(row.getCell(1)), e=txt(row.getCell(5));
+    if(/total budget hours/i.test(e)||/^total budget hours/i.test(first)){ row.eachCell(c=>{ if(c.col>5){ const n=val(c); if(n!==null&&tot===null) tot=n; } }); }
+    if(/^sub-?\s*contract technician/i.test(first)){ [6,7,8].forEach(k=>{ const n=val(row.getCell(k)); if(n) sub+=n; }); }
+  });
+  if(tot===null) return {vp:null,djb:null,from:''};
+  return {vp:Math.round((tot-sub)*100)/100, djb:Math.round(sub*100)/100, from:'sheet '+ws.name};
 }
 async function applyReadFiles(q,c){
   const msg=[], chk=[];
   if(q){ try{
-    const r=parseQuoteText(await readPdfLines(q));
+    const r=parseQuoteText(await readPdfLines(q)); window.__rev=r.rev;
     ['ref','name','builder','pm','notes','glance','needs'].forEach(k=>{ if(r[k]) S[k]=r[k]; });
     if(r.unitLabel) S.unitLabel=r.unitLabel;
-    const areas=[{id:'a'+Date.now()+'j',name:'Job level',units:1,job:true,lines:[{lib:'Air Conditioning Installation|67',mode:'fixed',qty:1}].concat(r.balLine?[{lib:'Duct Installation|10',mode:'fixed',qty:1}]:[])}];
-    const lv=r.levels.length?r.levels:[{name:'Area 1',units:1}];
-    lv.forEach((l,i)=>areas.push({id:'a'+Date.now()+'x'+i,name:l.name,units:l.units,job:false,lines:r.unitLines.map(([id,n])=>({lib:id,mode:'unit',qty:n})).concat(r.fixedLines.map(([id,n])=>({lib:id,mode:'fixed',qty:n})),r.balLine?[{lib:'Duct Installation|9',mode:'unit',qty:1}]:[])}));
+    const areas=[{id:'a'+Date.now()+'j',name:'Job level',units:1,job:true,lines:[{lib:'Air Conditioning Installation|67',mode:'fixed',qty:1}].concat(r.balance?[{lib:'Duct Installation|10',mode:'fixed',qty:1}]:[])}];
+    const lv=r.levels.length?r.levels:[{name:r.areaName||'Area 1',units:1}];
+    lv.forEach((l,i)=>areas.push({id:'a'+Date.now()+'x'+i,name:l.name,units:l.units,job:false,lines:r.unitLines.map(([id,n])=>({lib:id,mode:'unit',qty:n})).concat(r.fixedLines.map(([id,n,w])=>w?({lib:id,mode:'fixed',qty:n,who:w}):({lib:id,mode:'fixed',qty:n})),r.balLine?[{lib:'Duct Installation|9',mode:'unit',qty:1}]:[])}));
     S.areas=areas;
     msg.push('Quote read: '+(r.ref||'no number found')+', '+r.levels.length+' level'+(r.levels.length===1?'':'s')+(r.levels.length?' ('+r.levels.reduce((a,l)=>a+l.units,0)+' '+(r.unitLabel||'units')+')':'')+'.');
     if(!r.unitLines.length&&!r.fixedLines.length&&!r.balLine) chk.push('no scope items matched the guideline, so please add the items to each area yourself');
     else msg.push('Items matched: '+r.found.join(', ')+'.');
     if(!r.levels.length) chk.push('no levels with counts found, so one area was made');
     if(!r.ref) chk.push('quote number not found');
+    if(!r.levels.length) chk.push('this quote gives no quantities for ductwork, grilles, pipework or removal, so only equipment items were added; add the rest in the area');
     chk.push('check the quantities against the quote scope');
   }catch(e){ chk.push('could not read the quote PDF ('+((e&&e.message)||'error')+')'); } }
   if(c){ try{
-    const h=await readCostingHours(c);
+    const h=await readCostingHours(c,window.__rev);
     if(h.vp!=null) S.costVp=h.vp; if(h.djb!=null) S.costDjb=h.djb;
-    if(h.vp!=null||h.djb!=null) msg.push('Costing hours read: our crew '+(h.vp!=null?h.vp:'?')+' h, DJB '+(h.djb!=null?h.djb:'?')+' h.');
+    if(h.vp!=null||h.djb!=null) msg.push('Costing hours read'+(h.from?' from '+h.from:'')+': our crew '+(h.vp!=null?h.vp:'?')+' h, DJB '+(h.djb!=null?h.djb:'?')+' h.');
     else chk.push('no labour hours found in the costing sheet, so enter them under Costing sheet hours');
   }catch(e){ chk.push('could not read the costing sheet ('+((e&&e.message)||'error')+')'); } }
   renderSettings(); renderAreas(); recalc(); $('detailTitle').textContent=(S.ref||'New program')+(S.name?'  '+S.name:'');

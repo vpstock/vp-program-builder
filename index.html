@@ -98,6 +98,7 @@ textarea.csv{height:140px;font-family:ui-monospace,Menlo,monospace;font-size:12p
  .pvdoc,.pvdoc *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
  .pvdoc{font-size:9.5pt;line-height:1.35}.pvdoc h2{font-size:13pt;margin:10px 0 4px}.pvdoc .top h1{font-size:20pt}.pvdoc .g td{height:17px}.pvdoc li{margin-bottom:2px}.pvdoc .foot{margin-top:10px}
 }
+[hidden]{display:none!important}
 </style>
 </head>
 <body>
@@ -118,7 +119,7 @@ textarea.csv{height:140px;font-family:ui-monospace,Menlo,monospace;font-size:12p
 </section></div>
 <div id="detailView" hidden>
 <div class="row" style="margin-bottom:12px;align-items:center"><button class="ghost" id="backBtn">Back to list</button><h2 id="detailTitle" style="flex:1;margin:0 8px"></h2><button class="ghost" id="tasksBtn">Preview for daily tasks</button><button id="previewBtn">Preview for builder</button><button class="danger" id="delBtn">Delete</button></div>
-<div class="row" id="dtAtt" style="margin-bottom:12px;align-items:center;gap:8px;flex-wrap:wrap"><button class="ghost" id="addQuoteBtn">+ Quote</button><button class="ghost" id="addCostBtn">+ Costing sheet</button><span id="dtFiles" class="row" style="gap:6px;flex-wrap:wrap"></span></div>
+
 <div class="tiles" id="hTiles"></div>
 
 <section class="card">
@@ -179,6 +180,7 @@ textarea.csv{height:140px;font-family:ui-monospace,Menlo,monospace;font-size:12p
 </details>
 </section>
 </div>
+<div id="nqModal" hidden style="position:fixed;inset:0;background:rgba(10,26,77,.65);z-index:50;display:flex;align-items:center;justify-content:center;padding:3vh 3vw"><div style="background:#fff;border-radius:8px;padding:24px;max-width:460px;width:100%"><h2 style="margin:0 0 4px">New quote</h2><p class="note" style="margin:0 0 16px">Add the quote and the estimator's costing sheet. You can skip this and add them later from the list.</p><label style="display:block;margin-bottom:12px"><b>Quote</b> (PDF)<br><input type="file" id="nqQuote" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" style="margin-top:6px"></label><label style="display:block;margin-bottom:16px"><b>Costing sheet</b> (Excel)<br><input type="file" id="nqCost" accept=".xlsx,.xls,.csv" style="margin-top:6px"></label><div class="note" id="nqMsg"></div><div class="row" style="gap:8px;justify-content:flex-end"><button class="ghost" id="nqCancel">Cancel</button><button class="ghost" id="nqSkip">Skip</button><button id="nqGo">Continue</button></div></div></div>
 <div id="attModal" hidden style="position:fixed;inset:0;background:rgba(10,26,77,.65);z-index:50;padding:3vh 3vw">
 <div style="background:#fff;border-radius:8px;height:100%;display:flex;flex-direction:column;overflow:hidden">
 <div class="row" style="padding:10px 14px;border-bottom:1px solid #dfe4ec;align-items:center"><b id="attTitle" style="flex:1"></b><button class="ghost" id="attDl">Download</button><button class="danger" id="attRm">Remove</button><button id="attClose">Close</button></div>
@@ -524,7 +526,7 @@ function openJob(id){
   S=Object.assign(JSON.parse(JSON.stringify(EXTRAS)),st); S.hid=id; S.status=e.status; S.notes=e.notes; S.actualVp=e.actualVp; S.actualDjb=e.actualDjb;
   openDetail();
 }
-function openDetail(){ renderSettings(); renderAreas(); recalc(); $('detailTitle').textContent=(S.ref||'New program')+(S.name?'  '+S.name:''); $('saveMsg').textContent=''; $('delBtn').style.display=S.hid?'':'none'; renderDtFiles(); showView('detail'); }
+function openDetail(){ renderSettings(); renderAreas(); recalc(); $('detailTitle').textContent=(S.ref||'New program')+(S.name?'  '+S.name:''); $('saveMsg').textContent=''; $('delBtn').style.display=S.hid?'':'none'; showView('detail'); }
 function lines(s){ return String(s||'').split('\n').map(x=>x.trim()).filter(Boolean); }
 function renderPreview(){
   const rows=buildCosted().rows, p=plan(rows);
@@ -760,18 +762,24 @@ let attKind='';
 $('attInput').onchange=async e=>{
   const list=Array.from(e.target.files); e.target.value=''; let id=attTarget, k=attKind; attKind='';
   if(id==='__cur'){ if(!S.hid) await saveHist(false); id=S.hid; if(!id){ $('saveMsg').textContent+=' Could not attach, save failed.'; return; } }
-  await addFilesTo(id,list,k); if(attTarget==='__cur') renderDtFiles();
+  await addFilesTo(id,list,k); 
 };
-function renderDtFiles(){
-  const box=$('dtFiles'); if(!box) return; box.innerHTML='';
-  const e=S.hid&&HIST.find(h=>h.id===S.hid); const fs=(e&&e.files)||[];
-  fs.forEach((f,i)=>{ const b=document.createElement('button'); b.className='ghost'; b.textContent=fileLabel(f,i,fs.length)+': '+f.name; b.title='Preview '+f.name; b.style.maxWidth='260px'; b.style.overflow='hidden'; b.style.textOverflow='ellipsis'; b.style.whiteSpace='nowrap'; b.onclick=()=>previewFile(f,S.hid,i); box.appendChild(b); });
-}
-$('addQuoteBtn').onclick=()=>{ attTarget='__cur'; attKind='quote'; $('attInput').click(); };
-$('addCostBtn').onclick=()=>{ attTarget='__cur'; attKind='costing'; $('attInput').click(); };
 $('attClose').onclick=closeAtt;
 $('attModal').onclick=e=>{ if(e.target===$('attModal')) closeAtt(); };
-$('newProg').onclick=()=>{ S=blankProgram(); openDetail(); };
+$('newProg').onclick=()=>{ $('nqQuote').value=''; $('nqCost').value=''; $('nqMsg').textContent=''; $('nqModal').hidden=false; };
+$('nqCancel').onclick=()=>{ $('nqModal').hidden=true; };
+async function nqGo(skip){
+  const q=skip?null:$('nqQuote').files[0], c=skip?null:$('nqCost').files[0];
+  $('nqGo').disabled=true; $('nqSkip').disabled=true;
+  S=blankProgram(); openDetail();
+  if(q||c){
+    $('nqMsg').textContent='Attaching files...';
+    await saveHist(false);
+    if(S.hid){ if(q) await addFilesTo(S.hid,[q],'quote'); if(c) await addFilesTo(S.hid,[c],'costing'); }
+  }
+  $('nqModal').hidden=true; $('nqGo').disabled=false; $('nqSkip').disabled=false;
+}
+$('nqGo').onclick=()=>nqGo(false); $('nqSkip').onclick=()=>nqGo(true);
 $('backBtn').onclick=()=>{ showView('list'); renderHistory(); };
 $('previewBtn').onclick=renderPreview;
 $('pvBack').onclick=()=>showView('detail');

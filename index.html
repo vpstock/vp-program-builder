@@ -979,7 +979,21 @@ function histCsv(){
   filteredHist().forEach(e=>{ c+=[q(e.name),q(e.ref),q(e.status),q((e.savedAt||'').slice(0,10)),e.units,e.vp,e.djb,e.days,q(e.finish),e.units>0?r2((e.vp+e.djb)/e.units):'',e.actualVp==null?'':e.actualVp,e.actualDjb==null?'':e.actualDjb,q(e.notes)].join(',')+'\n'; });
   return c;
 }
-$('saveTok').onclick=()=>{ const v=$('ghtoken').value.trim(); if(v&&!v.startsWith('(')){ try{ localStorage.setItem('vp-pb-token',v); }catch(e){} initHistory(); } };
+$('saveTok').onclick=async()=>{ const v=$('ghtoken').value.trim(); const n=$('histNote');
+  if(v&&!v.startsWith('(')){ try{ localStorage.setItem('vp-pb-token',v); }catch(e){} }
+  const tok=ghToken();
+  if(!tok){ n.textContent='No token entered. Paste your GitHub token in the box, then click Save token.'; return; }
+  n.textContent='Token saved in this browser. Checking it can write to GitHub...';
+  try{
+    const r=await fetch('https://api.github.com/repos/'+GH.owner+'/'+GH.repo,{headers:{Authorization:'Bearer '+tok,Accept:'application/vnd.github+json'}});
+    if(r.status===401||r.status===403){ n.textContent='GitHub refused this token ('+r.status+'). Check it has not expired and has Contents read and write on vp-program-builder.'; return; }
+    if(r.status===404){ n.textContent='GitHub cannot see vp-program-builder with this token. Check the token is set to that repository.'; return; }
+    const j=await r.json();
+    if(j.permissions&&j.permissions.push===false){ n.textContent='Token works but is read only. Set Contents to Read and write.'; return; }
+    await initHistory();
+    n.textContent='Token works. Changes will save to GitHub and be shared with everyone.';
+  }catch(e){ n.textContent='Could not check the token ('+((e&&e.message)||'offline')+').'; }
+};
 $('clearTok').onclick=()=>{ try{ localStorage.removeItem('vp-pb-token'); }catch(e){} initHistory(); };
 $('refreshHist').onclick=()=>initHistory();
 $('saveHist').onclick=()=>saveHist(false);

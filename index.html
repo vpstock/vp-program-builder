@@ -851,6 +851,17 @@ async function readCostingHours(file,rev){
   if(tot===null) return {vp:null,djb:null,from:''};
   return {vp:Math.round((tot-sub)*100)/100, djb:Math.round(sub*100)/100, from:'sheet '+ws.name};
 }
+async function readDuctTakeoff(file){
+  await loadExcelJs();
+  const wb=new ExcelJS.Workbook(); await wb.xlsx.load(await file.arrayBuffer());
+  const ws=wb.worksheets.find(w=>/^ductworks?$/i.test(w.name)); if(!ws) return null;
+  const num=c=>{ let v=c&&c.value; if(v&&typeof v==='object'&&'result' in v) v=v.result; return (typeof v==='number')?v:null; };
+  let a13=0, a2=0, runs=0;
+  ws.eachRow((row,i)=>{ if(i<2||i>20) return; const w=num(row.getCell(4)), d=num(row.getCell(5)), l=num(row.getCell(6)); if(!(w>0&&d>0&&l>0)) return;
+    const area=2*(w+d)/1000*l; runs++; if(Math.max(w,d)<=400) a13+=area; else a2+=area; });
+  if(!runs) return null;
+  return {runs, a13:Math.round(a13*10)/10, a2:Math.round(a2*10)/10};
+}
 async function applyReadFiles(q,c){
   const msg=[], chk=[];
   if(q){ try{
@@ -866,7 +877,7 @@ async function applyReadFiles(q,c){
     else msg.push('Items matched: '+r.found.join(', ')+'.');
     if(!r.levels.length) chk.push('no levels with counts found, so one area was made');
     if(!r.ref) chk.push('quote number not found');
-    if(!r.levels.length) chk.push('this quote gives no quantities for ductwork, grilles, pipework or removal, so only equipment items were added; add the rest in the area');
+    if(!r.levels.length) chk.push('this quote gives no quantities for grilles, pipework, drains or removal, so only the equipment items (and duct area if the costing sheet has it) were added; add the rest in the area');
     chk.push('check the quantities against the quote scope');
   }catch(e){ chk.push('could not read the quote PDF ('+((e&&e.message)||'error')+')'); } }
   if(c){ try{
@@ -874,6 +885,11 @@ async function applyReadFiles(q,c){
     if(h.vp!=null) S.costVp=h.vp; if(h.djb!=null) S.costDjb=h.djb;
     if(h.vp!=null||h.djb!=null) msg.push('Costing hours read'+(h.from?' from '+h.from:'')+': our crew '+(h.vp!=null?h.vp:'?')+' h, DJB '+(h.djb!=null?h.djb:'?')+' h.');
     else chk.push('no labour hours found in the costing sheet, so enter them under Costing sheet hours');
+    const dt=await readDuctTakeoff(c);
+    if(dt){ const ar=S.areas.find(a=>!a.job)||S.areas[0];
+      if(dt.a13>0) ar.lines.push({lib:'Duct Installation|13',mode:'fixed',qty:dt.a13});
+      if(dt.a2>0) ar.lines.push({lib:'Duct Installation|2',mode:'fixed',qty:dt.a2});
+      msg.push('Duct area read from the DUCTWORKS tab: '+Math.round((dt.a13+dt.a2)*10)/10+' m2 over '+dt.runs+' runs ('+dt.a13+' m2 up to 400 mm, '+dt.a2+' m2 over). Added to '+ar.name+'.'); chk.push('make sure the DUCTWORKS tab matches the quote revision'); }
   }catch(e){ chk.push('could not read the costing sheet ('+((e&&e.message)||'error')+')'); } }
   renderSettings(); renderAreas(); recalc(); $('detailTitle').textContent=(S.ref||'New program')+(S.name?'  '+S.name:'');
   return msg.join(' ')+(chk.length?' To check: '+chk.join('; ')+'.':'');

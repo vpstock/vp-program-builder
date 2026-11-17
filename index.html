@@ -938,12 +938,12 @@ $('newProg').onclick=()=>{ $('nqQuote').value=''; $('nqCost').value=''; $('nqWsd
 $('nqCancel').onclick=()=>{ $('nqModal').hidden=true; };
 async function nqGo(skip){
   const q=skip?null:$('nqQuote').files[0], c=skip?null:$('nqCost').files[0], w=skip?null:$('nqWsd').files[0];
-  $('nqGo').disabled=true; $('nqSkip').disabled=true;
+  $('nqGo').disabled=true; $('nqSkip').disabled=true; $('nqModal').hidden=true;
   S=blankProgram(); openDetail();
   if(q||c||w){
-    $('nqMsg').textContent='Reading the files...';
+    $('saveMsg').textContent='Reading the files...';
     let rep=''; try{ rep=await applyReadFiles(q,c,w); }catch(e){ rep='Could not read the files: '+((e&&e.message)||'error'); } window.__rep=rep;
-    $('nqMsg').textContent='Saving...';
+    $('saveMsg').textContent='Saving...';
     await saveHist(false);
     if(S.hid){ if(q) await addFilesTo(S.hid,[q],'quote'); if(c) await addFilesTo(S.hid,[c],'costing'); if(w) await addFilesTo(S.hid,[w],'wsd'); }
   }

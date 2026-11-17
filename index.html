@@ -728,7 +728,7 @@ async function previewFile(f,id,idx){
   if(!f) return; $('histNote').textContent='Opening '+f.name+'...';
   try{
     const blob=await atBlob(f); const t=fileType(f.name,f.type); attUrl=URL.createObjectURL(blob);
-    $('attTitle').textContent=f.name; $('attDl').onclick=()=>saveBlob(blob,f.name); const rm=$('attRm'); rm.textContent='Remove'; rm.dataset.sure=''; rm.onclick=()=>{ if(!rm.dataset.sure){ rm.dataset.sure='1'; rm.textContent='Sure? Click again'; setTimeout(()=>{ rm.dataset.sure=''; rm.textContent='Remove'; },3500); return; } removeFileFrom(id,idx); };
+    $('attTitle').textContent=f.name; $('attDl').onclick=()=>saveBlob(blob,f.name); const rm=$('attRm'); rm.textContent='Remove'; rm.dataset.sure=''; rm.onclick=()=>{ if(confirm('Remove '+f.name+' from this quote? This cannot be undone.')) removeFileFrom(id,idx); };
     $('attBody').innerHTML=''; let el;
     if(t==='application/pdf'){ el=document.createElement('iframe'); el.src=attUrl; el.style.cssText='border:0;width:100%;height:100%'; }
     else if(/\.(xlsx|xls|csv)$/i.test(f.name)){ el=await xlsxView(blob); }

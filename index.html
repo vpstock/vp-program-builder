@@ -849,7 +849,10 @@ async function readCostingHours(file,rev){
     if(/^sub-?\s*contract technician/i.test(first)){ [6,7,8].forEach(k=>{ const n=val(row.getCell(k)); if(n) sub+=n; }); }
   });
   if(tot===null) return {vp:null,djb:null,from:''};
-  return {vp:Math.round((tot-sub)*100)/100, djb:Math.round(sub*100)/100, from:'sheet '+ws.name};
+  let pipe=null, drain=null, ph=0;
+  ws.eachRow((row,i)=>{ if(/^pipework$/i.test(txt(row.getCell(3)))) ph=i; if(/pvc drain/i.test(txt(row.getCell(1)))){ const n=val(row.getCell(3)); if(n>0) drain=n; } });
+  if(ph){ let t=0; for(let i=ph+1;i<=ph+8;i++){ const n=val(ws.getRow(i).getCell(3)); if(n>0) t+=n; } if(t>0) pipe=t; }
+  return {vp:Math.round((tot-sub)*100)/100, djb:Math.round(sub*100)/100, from:'sheet '+ws.name, pipe, drain};
 }
 async function readDuctTakeoff(file){
   await loadExcelJs();
@@ -885,6 +888,7 @@ async function applyReadFiles(q,c){
     if(h.vp!=null) S.costVp=h.vp; if(h.djb!=null) S.costDjb=h.djb;
     if(h.vp!=null||h.djb!=null) msg.push('Costing hours read'+(h.from?' from '+h.from:'')+': our crew '+(h.vp!=null?h.vp:'?')+' h, DJB '+(h.djb!=null?h.djb:'?')+' h.');
     else chk.push('no labour hours found in the costing sheet, so enter them under Costing sheet hours');
+    if(h.pipe||h.drain){ const t='Costing sheet lengths: '+(h.pipe?'refrigerant pipework '+h.pipe+' m':'')+(h.pipe&&h.drain?', ':'')+(h.drain?'PVC drain '+h.drain+' m':'')+'.'; S.notes=((S.notes||'')+' '+t).trim(); msg.push(t.replace('Costing sheet lengths','Pipe and drain read from the costing sheet')+' Saved in the quote notes; they do not add hours because the guideline has no per-metre pipe or drain row.'); }
     const dt=await readDuctTakeoff(c);
     if(dt){ const ar=S.areas.find(a=>!a.job)||S.areas[0];
       if(dt.a13>0) ar.lines.push({lib:'Duct Installation|13',mode:'fixed',qty:dt.a13});

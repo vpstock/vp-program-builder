@@ -33,6 +33,23 @@
      "local": false
     }
    ]
+  },
+  {
+   "id": "pvp-0826-6",
+   "name": "Northern Trust, Melbourne Office Refurbishment Works",
+   "ref": "PVP-0826-6",
+   "status": "Quoted",
+   "notes": "Costing sheet lengths: refrigerant pipework 150 m, PVC drain 33 m. WSD check from the 2 plan sheets, an estimate only and not used in the program: refrigerant pipe 147.6 m on the WSD vs 150 m in the costing sheet (matches); drain: nothing found on the WSD layers, costing sheet has 33 m; duct run length 14.5 m on the WSD vs 77.5 m in the costing sheet (does NOT match, ask Jen).",
+   "savedAt": "2026-11-17T02:23:57.213Z",
+   "units": 1,
+   "vp": 163.12,
+   "djb": 0,
+   "days": 12,
+   "finish": "2026-12-08",
+   "files": [],
+   "actualVp": null,
+   "actualDjb": null,
+   "stateJson": "{\"name\":\"Northern Trust, Melbourne Office Refurbishment Works\",\"ref\":\"PVP-0826-6\",\"start\":\"2026-11-23\",\"own\":2,\"djb\":1,\"hpd\":7.6,\"diff\":1,\"closures\":\"2026-12-23\\n2026-12-24\\n2026-12-25\\n2026-12-28\\n2026-12-29\\n2026-12-30\\n2026-12-31\\n2027-01-01\\n2027-01-04\\n2027-01-05\\n2027-01-26\",\"status\":\"Quoted\",\"notes\":\"Costing sheet lengths: refrigerant pipework 150 m, PVC drain 33 m. WSD check from the 2 plan sheets, an estimate only and not used in the program: refrigerant pipe 147.6 m on the WSD vs 150 m in the costing sheet (matches); drain: nothing found on the WSD layers, costing sheet has 33 m; duct run length 14.5 m on the WSD vs 77.5 m in the costing sheet (does NOT match, ask Jen).\",\"areas\":[{\"id\":\"a1794882234420j\",\"name\":\"Job level\",\"units\":1,\"job\":true,\"lines\":[{\"lib\":\"Air Conditioning Installation|67\",\"mode\":\"fixed\",\"qty\":1},{\"lib\":\"Duct Installation|10\",\"mode\":\"fixed\",\"qty\":1}]},{\"id\":\"a1794882234420x0\",\"name\":\"Levels 12 and 13\",\"units\":1,\"job\":false,\"lines\":[{\"lib\":\"Air Conditioning Installation|11\",\"mode\":\"fixed\",\"qty\":4},{\"lib\":\"Air Conditioning Installation|34\",\"mode\":\"fixed\",\"qty\":4},{\"lib\":\"Air Conditioning Installation|53\",\"mode\":\"fixed\",\"qty\":4},{\"lib\":\"Duct Installation|3\",\"mode\":\"fixed\",\"qty\":4},{\"lib\":\"Air Conditioning Installation|13\",\"mode\":\"fixed\",\"qty\":2},{\"lib\":\"Electrical Installation|21\",\"mode\":\"fixed\",\"qty\":4,\"who\":\"VP\"},{\"lib\":\"Fans|2\",\"mode\":\"fixed\",\"qty\":1},{\"lib\":\"Electrical Installation|30\",\"mode\":\"fixed\",\"qty\":1,\"who\":\"VP\"},{\"lib\":\"Duct Installation|13\",\"mode\":\"fixed\",\"qty\":73.8},{\"lib\":\"Duct Installation|2\",\"mode\":\"fixed\",\"qty\":13.2}]}],\"costVp\":410,\"costDjb\":0,\"builder\":\"Anthony Saraullo, Simbuilt Pty. Ltd.\",\"pm\":\"Lachlan French\",\"unitLabel\":\"units\",\"glance\":\"\",\"needs\":\"Structural certification.\\nFire sealing of penetrations.\\nBuilder's penetrations and building work, including cutting, patching and making good.\\nIsolators and tenant distribution board breakers (electrician).\\nTundish and hydraulic connection points (hydraulic contractor).\\nBalcony access, working platforms and crane or hoisting for the Level 13 condensing units.\\nGoods lift and loading dock bookings, out of hours site access, and coordination of power shutdown windows with the base building.\",\"conds\":\"Start is on written approval of price and time.\\nNormal working hours, no after hours work. Durations assume continuous access.\\nWe are closed from 23 December to 5 January, and this is not counted in the weeks shown.\\nMaterial lead times may affect the start.\",\"actualVp\":null,\"actualDjb\":null}"
   }
  ]
 }

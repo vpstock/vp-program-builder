@@ -180,7 +180,8 @@ textarea.csv{height:140px;font-family:ui-monospace,Menlo,monospace;font-size:12p
 </details>
 </section>
 </div>
-<div id="nqModal" hidden style="position:fixed;inset:0;background:rgba(10,26,77,.65);z-index:50;display:flex;align-items:center;justify-content:center;padding:3vh 3vw"><div style="background:#fff;border-radius:8px;padding:24px;max-width:460px;width:100%"><h2 style="margin:0 0 4px">New quote</h2><p class="note" style="margin:0 0 16px">Add the quote and the estimator's costing sheet. You can skip this and add them later from the list.</p><label style="display:block;margin-bottom:12px"><b>Quote</b> (PDF)<br><input type="file" id="nqQuote" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" style="margin-top:6px"></label><label style="display:block;margin-bottom:16px"><b>Costing sheet</b> (Excel)<br><input type="file" id="nqCost" accept=".xlsx,.xls,.csv" style="margin-top:6px"></label><div class="note" id="nqMsg"></div><div class="row" style="gap:8px;justify-content:flex-end"><button class="ghost" id="nqCancel">Cancel</button><button class="ghost" id="nqSkip">Skip</button><button id="nqGo">Continue</button></div></div></div>
+<div id="nqModal" hidden style="position:fixed;inset:0;background:rgba(10,26,77,.65);z-index:50;display:flex;align-items:center;justify-content:center;padding:3vh 3vw"><div style="background:#fff;border-radius:8px;padding:24px;max-width:460px;width:100%"><h2 style="margin:0 0 4px">New quote</h2><p class="note" style="margin:0 0 16px">Add the quote and the estimator's costing sheet. You can skip this and add them later from the list.</p><label style="display:block;margin-bottom:12px"><b>Quote</b> (PDF)<br><input type="file" id="nqQuote" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" style="margin-top:6px"></label><label style="display:block;margin-bottom:16px"><b>Costing sheet</b> (Excel)<br><input type="file" id="nqCost" accept=".xlsx,.xls,.csv" style="margin-top:6px"></label><label style="display:block;margin-bottom:16px"><b>WSD</b> (optional, PDF). Only used to check the pipe, drain and duct lengths<br><input type="file" id="nqWsd" accept=".pdf" style="margin-top:6px"></label>
+<div class="note" id="nqMsg"></div><div class="row" style="gap:8px;justify-content:flex-end"><button class="ghost" id="nqCancel">Cancel</button><button class="ghost" id="nqSkip">Skip</button><button id="nqGo">Continue</button></div></div></div>
 <div id="attModal" hidden style="position:fixed;inset:0;background:rgba(10,26,77,.65);z-index:50;padding:3vh 3vw">
 <div style="background:#fff;border-radius:8px;height:100%;display:flex;flex-direction:column;overflow:hidden">
 <div class="row" style="padding:10px 14px;border-bottom:1px solid #dfe4ec;align-items:center"><b id="attTitle" style="flex:1"></b><button class="ghost" id="attDl">Download</button><button class="danger" id="attRm">Remove</button><button id="attClose">Close</button></div>
@@ -628,7 +629,7 @@ $('tkPdf').onclick=async()=>{
 };
 
 const AT_MAX=25*1024*1024;
-function fileLabel(f,i,n){ if(f.kind==='quote') return 'Quote'; if(f.kind==='costing') return 'Costing sheet'; if(n<2) return 'View'; if(/costing|register/i.test(f.name)) return 'Costing sheet'; if(/\.pdf$/i.test(f.name)) return 'Quote'; return 'File '+(i+1); }
+function fileLabel(f,i,n){ if(f.kind==='wsd') return 'WSD'; if(f.kind==='quote') return 'Quote'; if(f.kind==='costing') return 'Costing sheet'; if(n<2) return 'View'; if(/costing|register/i.test(f.name)) return 'Costing sheet'; if(/\.pdf$/i.test(f.name)) return 'Quote'; return 'File '+(i+1); }
 function safeName(n){ return String(n).replace(/[^A-Za-z0-9._-]+/g,'-').replace(/^-+|-+$/g,'')||'file'; }
 function fmtSize(b){ return b>1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB'; }
 function fileType(n,t){ if(t) return t; const e=(n.split('.').pop()||'').toLowerCase(); return ({pdf:'application/pdf',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',webp:'image/webp'})[e]||'application/octet-stream'; }
@@ -859,14 +860,42 @@ async function readDuctTakeoff(file){
   const wb=new ExcelJS.Workbook(); await wb.xlsx.load(await file.arrayBuffer());
   const ws=wb.worksheets.find(w=>/^ductworks?$/i.test(w.name)); if(!ws) return null;
   const num=c=>{ let v=c&&c.value; if(v&&typeof v==='object'&&'result' in v) v=v.result; return (typeof v==='number')?v:null; };
-  let a13=0, a2=0, runs=0;
+  let a13=0, a2=0, runs=0, len=0;
   ws.eachRow((row,i)=>{ if(i<2||i>20) return; const w=num(row.getCell(4)), d=num(row.getCell(5)), l=num(row.getCell(6)); if(!(w>0&&d>0&&l>0)) return;
-    const area=2*(w+d)/1000*l; runs++; if(Math.max(w,d)<=400) a13+=area; else a2+=area; });
+    const area=2*(w+d)/1000*l; runs++; len+=l; if(Math.max(w,d)<=400) a13+=area; else a2+=area; });
   if(!runs) return null;
-  return {runs, a13:Math.round(a13*10)/10, a2:Math.round(a2*10)/10};
+  return {runs, len:Math.round(len*10)/10, a13:Math.round(a13*10)/10, a2:Math.round(a2*10)/10};
 }
-async function applyReadFiles(q,c){
-  const msg=[], chk=[];
+
+function loadPdfJs(){ return window.pdfjsLib?Promise.resolve():loadScriptFrom(libUrls('pdf.min.js','https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js')).then(()=>{ pdfjsLib.GlobalWorkerOptions.workerSrc=new URL('vendor/pdf.worker.min.js',location.href).href; }); }
+// WSD cross-check: measures new linework by CAD layer on the proposed plan sheets. An estimate to compare, never fed into the program.
+async function readWsdLayers(file){
+  await loadPdfJs();
+  const doc=await pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
+  const cfg=await doc.getOptionalContentConfig(), names={}, gr=cfg.getGroups()||{}; Object.keys(gr).forEach(id=>names[id]=gr[id].name||'');
+  const OPS=pdfjsLib.OPS, tot={refrigerant:0,condensate:0,duct:0,flex:0}; let sheets=0;
+  const cat=n=>{ if(!n||/DEMOLITION|_EX\b|_EX\.|EXIST|LEGEND/i.test(n)) return null; if(/REFRIG/i.test(n)) return 'refrigerant'; if(/CONDENS|DRAIN/i.test(n)) return 'condensate'; if(/FLEX/i.test(n)) return 'flex'; if(/DUCT/i.test(n)&&!/POP|DAMPER/i.test(n)) return 'duct'; return null; };
+  for(let pn=1;pn<=doc.numPages;pn++){
+    const pg=await doc.getPage(pn), tx=(await pg.getTextContent()).items.map(i=>i.str).join(' ');
+    if(!/PROPOSED PLAN/i.test(tx)) continue; sheets++;
+    const sm=tx.match(/1\s*:\s*(\d+)\s*@\s*A\d/), scale=sm?+sm[1]:100, k=0.3528*scale/1000;
+    const ol=await pg.getOperatorList(), fn=ol.fnArray, ar=ol.argsArray;
+    let ctm=[1,0,0,1,0,0]; const st=[], mc=[]; let path=[]; const lay=()=>{ for(let i=mc.length-1;i>=0;i--) if(mc[i]) return mc[i]; return null; };
+    const mul=(m,n)=>[m[0]*n[0]+m[2]*n[1], m[1]*n[0]+m[3]*n[1], m[0]*n[2]+m[2]*n[3], m[1]*n[2]+m[3]*n[3], m[0]*n[4]+m[2]*n[5]+m[4], m[1]*n[4]+m[3]*n[5]+m[5]];
+    const P=(x,y)=>[ctm[0]*x+ctm[2]*y+ctm[4], ctm[1]*x+ctm[3]*y+ctm[5]];
+    const strokeLen=()=>{ let L=0, cur=null, start=null; for(const seg of path){ if(seg[0]==='m'){ cur=P(seg[1],seg[2]); start=cur; } else if(seg[0]==='l'&&cur){ const q=P(seg[1],seg[2]); L+=Math.hypot(q[0]-cur[0],q[1]-cur[1]); cur=q; } else if(seg[0]==='c'&&cur){ const q=P(seg[1],seg[2]); L+=Math.hypot(q[0]-cur[0],q[1]-cur[1]); cur=q; } else if(seg[0]==='z'&&cur&&start){ L+=Math.hypot(start[0]-cur[0],start[1]-cur[1]); cur=start; } } return L; };
+    for(let i=0;i<fn.length;i++){ const f=fn[i], a=ar[i];
+      if(f===OPS.save) st.push(ctm.slice()); else if(f===OPS.restore){ if(st.length) ctm=st.pop(); } else if(f===OPS.transform) ctm=mul(ctm,a);
+      else if(f===OPS.beginMarkedContentProps){ mc.push(a[0]==='OC'&&a[1]?(names[typeof a[1]==='object'?a[1].id:a[1]]||null):null); } else if(f===OPS.beginMarkedContent) mc.push(null); else if(f===OPS.endMarkedContent) mc.pop();
+      else if(f===OPS.constructPath){ const ops=a[0], c=a[1]; let j=0; for(const o of ops){ if(o===OPS.moveTo){ path.push(['m',c[j],c[j+1]]); j+=2; } else if(o===OPS.lineTo){ path.push(['l',c[j],c[j+1]]); j+=2; } else if(o===OPS.curveTo){ path.push(['c',c[j+4],c[j+5]]); j+=6; } else if(o===OPS.curveTo2||o===OPS.curveTo3){ path.push(['c',c[j+2],c[j+3]]); j+=4; } else if(o===OPS.closePath) path.push(['z']); else if(o===OPS.rectangle){ const x=c[j],y=c[j+1],w=c[j+2],h=c[j+3]; path.push(['m',x,y],['l',x+w,y],['l',x+w,y+h],['l',x,y+h],['z']); j+=4; } } }
+      else if(f===OPS.stroke||f===OPS.closeStroke||f===OPS.fillStroke||f===OPS.eoFillStroke||f===OPS.closeFillStroke||f===OPS.closeEOFillStroke){ const c=cat(lay()); if(c) tot[c]+=strokeLen()*k; path=[]; }
+      else if(f===OPS.fill||f===OPS.eoFill||f===OPS.endPath) path=[];
+    }
+  }
+  Object.keys(tot).forEach(x=>tot[x]=Math.round(tot[x]*10)/10); tot.sheets=sheets; return tot;
+}
+async function applyReadFiles(q,c,w){
+  const msg=[], chk=[], cost={};
   if(q){ try{
     const r=parseQuoteText(await readPdfLines(q)); window.__rev=r.rev;
     ['ref','name','builder','pm','notes','glance','needs'].forEach(k=>{ if(r[k]) S[k]=r[k]; });
@@ -884,35 +913,42 @@ async function applyReadFiles(q,c){
     chk.push('check the quantities against the quote scope');
   }catch(e){ chk.push('could not read the quote PDF ('+((e&&e.message)||'error')+')'); } }
   if(c){ try{
-    const h=await readCostingHours(c,window.__rev);
+    const h=await readCostingHours(c,window.__rev); cost.pipe=h.pipe; cost.drain=h.drain;
     if(h.vp!=null) S.costVp=h.vp; if(h.djb!=null) S.costDjb=h.djb;
     if(h.vp!=null||h.djb!=null) msg.push('Costing hours read'+(h.from?' from '+h.from:'')+': our crew '+(h.vp!=null?h.vp:'?')+' h, DJB '+(h.djb!=null?h.djb:'?')+' h.');
     else chk.push('no labour hours found in the costing sheet, so enter them under Costing sheet hours');
     if(h.pipe||h.drain){ const t='Costing sheet lengths: '+(h.pipe?'refrigerant pipework '+h.pipe+' m':'')+(h.pipe&&h.drain?', ':'')+(h.drain?'PVC drain '+h.drain+' m':'')+'.'; S.notes=((S.notes||'')+' '+t).trim(); msg.push(t.replace('Costing sheet lengths','Pipe and drain read from the costing sheet')+' Saved in the quote notes; they do not add hours because the guideline has no per-metre pipe or drain row.'); }
     const dt=await readDuctTakeoff(c);
+    if(dt) cost.duct=dt.len;
     if(dt){ const ar=S.areas.find(a=>!a.job)||S.areas[0];
       if(dt.a13>0) ar.lines.push({lib:'Duct Installation|13',mode:'fixed',qty:dt.a13});
       if(dt.a2>0) ar.lines.push({lib:'Duct Installation|2',mode:'fixed',qty:dt.a2});
       msg.push('Duct area read from the DUCTWORKS tab: '+Math.round((dt.a13+dt.a2)*10)/10+' m2 over '+dt.runs+' runs ('+dt.a13+' m2 up to 400 mm, '+dt.a2+' m2 over). Added to '+ar.name+'.'); chk.push('make sure the DUCTWORKS tab matches the quote revision'); }
   }catch(e){ chk.push('could not read the costing sheet ('+((e&&e.message)||'error')+')'); } }
+  if(w){ try{
+    const m=await readWsdLayers(w), cmp=(name,wv,cv,unit)=>{ if(!cv) return name+' '+wv+' '+unit+' on the WSD'; if(!wv) return name+': nothing found on the WSD layers, costing sheet has '+cv+' '+unit; const d=Math.abs(wv-cv)/cv; return name+' '+wv+' '+unit+' on the WSD vs '+cv+' '+unit+' in the costing sheet ('+(d<=0.15?'matches':'does NOT match, ask Jen')+')'; };
+    const t='WSD check from the '+m.sheets+' plan sheets, an estimate only and not used in the program: '+[cmp('refrigerant pipe',m.refrigerant,cost.pipe,'m'),cmp('drain',m.condensate,cost.drain,'m'),cmp('duct run length',m.duct,cost.duct,'m')].join('; ')+'.';
+    msg.push(t); S.notes=((S.notes||'')+' '+t).trim();
+    if(!m.sheets) chk.push('no proposed plan sheets found in the WSD, so nothing was measured');
+  }catch(e){ chk.push('could not read the WSD ('+((e&&e.message)||'error')+')'); } }
   renderSettings(); renderAreas(); recalc(); $('detailTitle').textContent=(S.ref||'New program')+(S.name?'  '+S.name:'');
   return msg.join(' ')+(chk.length?' To check: '+chk.join('; ')+'.':'');
 }
-$('newProg').onclick=()=>{ $('nqQuote').value=''; $('nqCost').value=''; $('nqMsg').textContent=''; $('nqModal').hidden=false; };
+$('newProg').onclick=()=>{ $('nqQuote').value=''; $('nqCost').value=''; $('nqWsd').value=''; $('nqMsg').textContent=''; $('nqModal').hidden=false; };
 $('nqCancel').onclick=()=>{ $('nqModal').hidden=true; };
 async function nqGo(skip){
-  const q=skip?null:$('nqQuote').files[0], c=skip?null:$('nqCost').files[0];
+  const q=skip?null:$('nqQuote').files[0], c=skip?null:$('nqCost').files[0], w=skip?null:$('nqWsd').files[0];
   $('nqGo').disabled=true; $('nqSkip').disabled=true;
   S=blankProgram(); openDetail();
-  if(q||c){
+  if(q||c||w){
     $('nqMsg').textContent='Reading the files...';
-    let rep=''; try{ rep=await applyReadFiles(q,c); }catch(e){ rep='Could not read the files: '+((e&&e.message)||'error'); } window.__rep=rep;
+    let rep=''; try{ rep=await applyReadFiles(q,c,w); }catch(e){ rep='Could not read the files: '+((e&&e.message)||'error'); } window.__rep=rep;
     $('nqMsg').textContent='Saving...';
     await saveHist(false);
-    if(S.hid){ if(q) await addFilesTo(S.hid,[q],'quote'); if(c) await addFilesTo(S.hid,[c],'costing'); }
+    if(S.hid){ if(q) await addFilesTo(S.hid,[q],'quote'); if(c) await addFilesTo(S.hid,[c],'costing'); if(w) await addFilesTo(S.hid,[w],'wsd'); }
   }
   $('nqModal').hidden=true; $('nqGo').disabled=false; $('nqSkip').disabled=false;
-  if(q||c) $('saveMsg').textContent=(window.__rep||'')+' '+$('saveMsg').textContent;
+  if(q||c||w) $('saveMsg').textContent=(window.__rep||'')+' '+$('saveMsg').textContent;
 }
 $('nqGo').onclick=()=>nqGo(false); $('nqSkip').onclick=()=>nqGo(true);
 $('backBtn').onclick=()=>{ showView('list'); renderHistory(); };
